@@ -20,7 +20,7 @@ class TouchGrassModule : Module() {
 
     Function("isAccessibilityServiceEnabled") {
       val context = appContext.reactContext ?: return@Function false
-      val expectedServiceName = context.packageName + "/" + TouchGrassAccessibilityService::class.java.canonicalName
+      val expectedServiceName = context.packageName + "/" + TouchGrassAccessibilityService::class.java.name
       var accessibilityEnabled = 0
       try {
         accessibilityEnabled = Settings.Secure.getInt(
@@ -137,7 +137,7 @@ class TouchGrassModule : Module() {
         }
 
         appsList.add(
-          mapOf(
+          mapOf<String, Any>(
             "packageName" to packageName,
             "label" to appName,
             "iconBase64" to base64Icon
