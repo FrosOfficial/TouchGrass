@@ -5,7 +5,7 @@ group = 'com.touchgrass'
 version = '1.0.0'
 
 android {
-    namespace "com.touchgrass"
+    namespace "com.touchgrassmodule"
     compileSdkVersion 35
 
     defaultConfig {

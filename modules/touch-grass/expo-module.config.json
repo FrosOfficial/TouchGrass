@@ -2,7 +2,7 @@
   "platforms": ["android"],
   "android": {
     "modules": [
-      "com.touchgrass.TouchGrassModule"
+      "com.touchgrassmodule.TouchGrassModule"
     ]
   }
 }

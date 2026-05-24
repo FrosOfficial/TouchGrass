@@ -1,4 +1,4 @@
-package com.touchgrass
+package com.touchgrassmodule
 
 import android.content.Context
 import android.content.Intent

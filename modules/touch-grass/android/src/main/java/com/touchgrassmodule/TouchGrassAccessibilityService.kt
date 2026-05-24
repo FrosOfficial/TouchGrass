@@ -1,4 +1,4 @@
-package com.touchgrass
+package com.touchgrassmodule
 
 import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityEvent

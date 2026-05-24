@@ -5,7 +5,7 @@
 
     <application>
         <service
-            android:name="com.touchgrass.TouchGrassAccessibilityService"
+            android:name="com.touchgrassmodule.TouchGrassAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="true"
             android:label="TouchGrass Shield Service">
