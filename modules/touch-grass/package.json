@@ -1,0 +1,10 @@
+{
+  "name": "touch-grass",
+  "version": "1.0.0",
+  "description": "Local native module for TouchGrassAccessibilityService",
+  "main": "index.ts",
+  "types": "index.ts",
+  "peerDependencies": {
+    "expo": "*"
+  }
+}
