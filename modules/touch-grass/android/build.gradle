@@ -1,7 +1,8 @@
 apply plugin: 'com.android.library'
 apply plugin: 'expo-module'
+apply plugin: 'org.jetbrains.kotlin.android'
 
-group = 'com.touchgrass'
+group = 'com.touchgrassmodule'
 version = '1.0.0'
 
 android {
