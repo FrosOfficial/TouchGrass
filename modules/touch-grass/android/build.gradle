@@ -1,0 +1,20 @@
+apply plugin: 'com.android.library'
+apply plugin: 'expo-module'
+apply plugin: 'kotlin-android'
+
+group = 'com.touchgrass'
+version = '1.0.0'
+
+android {
+    namespace "com.touchgrass"
+    compileSdkVersion 35
+
+    defaultConfig {
+        minSdkVersion 24
+        targetSdkVersion 35
+    }
+
+    lintOptions {
+        abortOnError false
+    }
+}
