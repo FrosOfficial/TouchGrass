@@ -194,9 +194,9 @@ export default function DashboardScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {isCheckingLock ? (
-        <View style={{ flex: 1, backgroundColor: '#0D0D0D' }} />
+        <View key="checking-view" style={{ flex: 1, backgroundColor: '#0D0D0D' }} />
       ) : (
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <ScrollView key="dashboard-view" contentContainerStyle={styles.scrollContainer}>
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>TOUCHGRASS</Text>
