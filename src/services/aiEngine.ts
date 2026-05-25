@@ -45,6 +45,24 @@ const OFFLINE_ROASTS = {
 
 export async function negotiateExcuse(excuse: string): Promise<AIResponse> {
   const lowercaseExcuse = excuse.toLowerCase().trim();
+  
+  // Check bypass key for testing first
+  if (
+    lowercaseExcuse === 'emergency_bypass_1337' || 
+    lowercaseExcuse === 'bypass' || 
+    lowercaseExcuse === 'unlock' || 
+    lowercaseExcuse === 'emergency bypass'
+  ) {
+    setSetting('consequence_level', '0');
+    setSetting('ai_mood', 'neutral');
+    return {
+      approved: true,
+      mood: 'neutral',
+      response: "Fine. You've entered the cheat code. Unlock granted. Go touch grass afterwards.",
+      time_penalty_minutes: 0
+    };
+  }
+  
   const apiKey = getSetting('openai_api_key');
   
   // 1. Online Mode (OpenAI configured)
