@@ -35,6 +35,7 @@ export default function DashboardScreen() {
   const [lockUntil, setLockUntil] = useState(0);
   const [blockedCount, setBlockedCount] = useState(0);
   const [isCheckingLock, setIsCheckingLock] = useState(true);
+  const [isTimerExpired, setIsTimerExpired] = useState(false);
   
   // Permissions
   const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
@@ -79,9 +80,14 @@ export default function DashboardScreen() {
         const activePackages = schedules.filter(s => s.is_enabled).map(s => s.app_package).join(',');
         
         const state = TouchGrass.getLockState();
+        const now = Date.now();
         
         let targetLocked = state.isLocked;
         let targetUntil = state.lockUntil;
+
+        // Check if the timer has expired
+        const expired = state.isLocked && state.lockUntil <= now;
+        setIsTimerExpired(expired);
 
         // Always make sure latest active packages are synced to SharedPreferences
         TouchGrass.updateLockState(state.isLocked, state.lockUntil, activePackages);
@@ -135,9 +141,25 @@ export default function DashboardScreen() {
     }
 
     if (isLocked) {
-      // Attempting to stop the shield triggers the sarcastic negotiation!
-      // In a regular lock app, users can just toggle it off. Here, trying to turn it off brings you to the Negotiation Room!
-      router.push('/lockscreen');
+      if (isTimerExpired) {
+        // If manual lock is completed, let them disable it directly without negotiation!
+        if (Platform.OS === 'android') {
+          try {
+            const schedules = DB.getSchedules();
+            const activePackages = schedules.filter(s => s.is_enabled).map(s => s.app_package).join(',');
+            TouchGrass.updateLockState(false, 0, activePackages);
+          } catch (e) {
+            console.error("Failed to unlock natively:", e);
+          }
+        }
+        setIsLocked(false);
+        setLockUntil(0);
+        setIsTimerExpired(false);
+        loadData();
+      } else {
+        // Active manual lock or active global lock requires negotiation!
+        router.push('/lockscreen');
+      }
     } else {
       // Start the shield!
       // Fetch all schedules packages or just add all listed packages
@@ -240,7 +262,7 @@ export default function DashboardScreen() {
                   {isLocked ? 'SHIELD ON' : 'SHIELD OFF'}
                 </Text>
                 <Text style={styles.dialDetail}>
-                  {isLocked ? `${blockedCount} APPS BLOCKED` : 'READY FOR SHIELD'}
+                  {isLocked ? (isTimerExpired ? 'HUSTLE COMPLETE' : `${blockedCount} APPS BLOCKED`) : 'READY FOR SHIELD'}
                 </Text>
               </View>
             </View>
@@ -269,10 +291,17 @@ export default function DashboardScreen() {
             onPress={toggleShield}
           >
             {isLocked ? (
-              <>
-                <Square color="#FFFFFF" size={20} fill="#FFFFFF" />
-                <Text style={styles.actionButtonText}>NEGOTIATE DISABLE</Text>
-              </>
+              isTimerExpired ? (
+                <>
+                  <Square color="#FFFFFF" size={20} fill="#FFFFFF" />
+                  <Text style={styles.actionButtonText}>DISABLE SHIELD</Text>
+                </>
+              ) : (
+                <>
+                  <Square color="#FFFFFF" size={20} fill="#FFFFFF" />
+                  <Text style={styles.actionButtonText}>NEGOTIATE DISABLE</Text>
+                </>
+              )
             ) : (
               <>
                 <Play color="#FFFFFF" size={20} fill="#FFFFFF" />
