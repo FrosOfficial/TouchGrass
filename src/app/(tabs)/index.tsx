@@ -79,20 +79,12 @@ export default function DashboardScreen() {
         const activePackages = schedules.filter(s => s.is_enabled).map(s => s.app_package).join(',');
         
         const state = TouchGrass.getLockState();
-        const now = Date.now();
         
         let targetLocked = state.isLocked;
         let targetUntil = state.lockUntil;
 
-        // Reset manual lock if the timer finished
-        if (state.isLocked && state.lockUntil <= now) {
-          TouchGrass.updateLockState(false, 0, activePackages);
-          targetLocked = false;
-          targetUntil = 0;
-        } else {
-          // Always make sure latest active packages are synced to SharedPreferences
-          TouchGrass.updateLockState(state.isLocked, state.lockUntil, activePackages);
-        }
+        // Always make sure latest active packages are synced to SharedPreferences
+        TouchGrass.updateLockState(state.isLocked, state.lockUntil, activePackages);
 
         // Check if the Global Lockdown window is active in JS to show correctly in the UI
         let isGlobalLocked = false;
