@@ -5,6 +5,34 @@ import { Clock, Plus, Trash2, ShieldAlert } from 'lucide-react-native';
 import * as DB from '../../db/database';
 import * as TouchGrass from 'touch-grass';
 
+function parse24To12(time24: string) {
+  const [hStr, mStr] = (time24 || "09:00").split(':');
+  let h = parseInt(hStr, 10);
+  if (isNaN(h)) h = 9;
+  const m = mStr || "00";
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  if (h === 0) h = 12;
+  return {
+    hours: h.toString(),
+    minutes: m,
+    ampm
+  };
+}
+
+function compose12To24(hours12: string, minutes: string, ampm: 'AM' | 'PM') {
+  let h = parseInt(hours12, 10);
+  if (isNaN(h) || h < 1 || h > 12) h = 12;
+  const m = minutes.padStart(2, '0');
+  if (ampm === 'PM' && h !== 12) {
+    h += 12;
+  } else if (ampm === 'AM' && h === 12) {
+    h = 0;
+  }
+  const hStr = h.toString().padStart(2, '0');
+  return `${hStr}:${m}`;
+}
+
 export default function SchedulesScreen() {
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('17:00');
@@ -93,6 +121,48 @@ export default function SchedulesScreen() {
     saveSettings(startTime, endTime, nextEnabled, activePreset);
   };
 
+  const start12 = parse24To12(startTime);
+  const end12 = parse24To12(endTime);
+
+  const handleTimeChange = (type: 'start' | 'end', key: 'hours' | 'minutes' | 'ampm', val: string) => {
+    const current = type === 'start' ? start12 : end12;
+    const newComponents = { ...current, [key]: val };
+    
+    // Auto-clamp and format hours
+    let cleanHours = newComponents.hours;
+    if (key === 'hours') {
+      const hInt = parseInt(val, 10);
+      if (!isNaN(hInt)) {
+        if (hInt < 1) cleanHours = "1";
+        else if (hInt > 12) cleanHours = "12";
+        else cleanHours = hInt.toString();
+      } else {
+        cleanHours = "";
+      }
+    }
+    
+    // Auto-clamp and format minutes
+    let cleanMinutes = newComponents.minutes;
+    if (key === 'minutes') {
+      const mInt = parseInt(val, 10);
+      if (!isNaN(mInt)) {
+        if (mInt < 0) cleanMinutes = "00";
+        else if (mInt > 59) cleanMinutes = "59";
+        else cleanMinutes = val;
+      } else {
+        cleanMinutes = "";
+      }
+    }
+
+    const next24 = compose12To24(cleanHours || "12", cleanMinutes || "00", newComponents.ampm as 'AM' | 'PM');
+    
+    if (type === 'start') {
+      saveSettings(next24, endTime, isGlobalEnabled, null);
+    } else {
+      saveSettings(startTime, next24, isGlobalEnabled, null);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -124,33 +194,71 @@ export default function SchedulesScreen() {
           <View style={styles.timeInputsRow}>
             <View style={styles.timeInputCol}>
               <Text style={styles.timeLabel}>START LOCK</Text>
-              <TextInput
-                style={styles.timeInput}
-                value={startTime}
-                onChangeText={(text) => saveSettings(text, endTime, isGlobalEnabled, null)}
-                placeholder="09:00"
-                placeholderTextColor="#444444"
-                keyboardType="numeric"
-                maxLength={5}
-              />
+              <View style={styles.timePickerContainer}>
+                <TextInput
+                  style={styles.timeField}
+                  value={start12.hours}
+                  onChangeText={(text) => handleTimeChange('start', 'hours', text)}
+                  placeholder="9"
+                  placeholderTextColor="#444444"
+                  keyboardType="numeric"
+                  maxLength={2}
+                />
+                <Text style={styles.timeColon}>:</Text>
+                <TextInput
+                  style={styles.timeField}
+                  value={start12.minutes}
+                  onChangeText={(text) => handleTimeChange('start', 'minutes', text)}
+                  placeholder="00"
+                  placeholderTextColor="#444444"
+                  keyboardType="numeric"
+                  maxLength={2}
+                />
+                <TouchableOpacity 
+                  style={styles.ampmButton}
+                  onPress={() => handleTimeChange('start', 'ampm', start12.ampm === 'AM' ? 'PM' : 'AM')}
+                >
+                  <Text style={styles.ampmText}>{start12.ampm}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
+            
             <View style={styles.timeInputSeparator}>
               <Text style={styles.separatorText}>UNTIL</Text>
             </View>
+            
             <View style={styles.timeInputCol}>
               <Text style={styles.timeLabel}>RELEASE LOCK</Text>
-              <TextInput
-                style={styles.timeInput}
-                value={endTime}
-                onChangeText={(text) => saveSettings(startTime, text, isGlobalEnabled, null)}
-                placeholder="17:00"
-                placeholderTextColor="#444444"
-                keyboardType="numeric"
-                maxLength={5}
-              />
+              <View style={styles.timePickerContainer}>
+                <TextInput
+                  style={styles.timeField}
+                  value={end12.hours}
+                  onChangeText={(text) => handleTimeChange('end', 'hours', text)}
+                  placeholder="5"
+                  placeholderTextColor="#444444"
+                  keyboardType="numeric"
+                  maxLength={2}
+                />
+                <Text style={styles.timeColon}>:</Text>
+                <TextInput
+                  style={styles.timeField}
+                  value={end12.minutes}
+                  onChangeText={(text) => handleTimeChange('end', 'minutes', text)}
+                  placeholder="00"
+                  placeholderTextColor="#444444"
+                  keyboardType="numeric"
+                  maxLength={2}
+                />
+                <TouchableOpacity 
+                  style={styles.ampmButton}
+                  onPress={() => handleTimeChange('end', 'ampm', end12.ampm === 'AM' ? 'PM' : 'AM')}
+                >
+                  <Text style={styles.ampmText}>{end12.ampm}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-          <Text style={styles.timeTip}>Use 24-hour formatting (HH:MM) e.g., 22:30 for 10:30 PM.</Text>
+          <Text style={styles.timeTip}>Set hours (1-12), minutes (00-59), and toggle AM/PM.</Text>
         </View>
 
         {/* Preset Header */}
@@ -163,7 +271,7 @@ export default function SchedulesScreen() {
         >
           <View style={styles.presetHeader}>
             <Text style={styles.presetName}>💼 The 9-to-5 Hustle</Text>
-            <Text style={styles.presetTime}>09:00 - 17:00</Text>
+            <Text style={styles.presetTime}>9:00 AM - 5:00 PM</Text>
           </View>
           <Text style={styles.presetDesc}>Blocks procrastination apps completely during prime working hours.</Text>
         </TouchableOpacity>
@@ -174,7 +282,7 @@ export default function SchedulesScreen() {
         >
           <View style={styles.presetHeader}>
             <Text style={styles.presetName}>🌅 Sunrise Focus</Text>
-            <Text style={styles.presetTime}>06:00 - 09:00</Text>
+            <Text style={styles.presetTime}>6:00 AM - 9:00 AM</Text>
           </View>
           <Text style={styles.presetDesc}>Guarantees a doomscroll-free morning so you can wake up properly.</Text>
         </TouchableOpacity>
@@ -185,7 +293,7 @@ export default function SchedulesScreen() {
         >
           <View style={styles.presetHeader}>
             <Text style={styles.presetName}>🌙 Sleep Shield</Text>
-            <Text style={styles.presetTime}>22:00 - 06:00</Text>
+            <Text style={styles.presetTime}>10:00 PM - 6:00 AM</Text>
           </View>
           <Text style={styles.presetDesc}>Ensures no late-night feeds interrupt your recovery sleep cycle.</Text>
         </TouchableOpacity>
@@ -297,13 +405,46 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 6,
   },
-  timeInput: {
+  timePickerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#151515',
+    borderWidth: 1,
+    borderColor: '#222222',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    height: 46,
+  },
+  timeField: {
     color: '#FFFFFF',
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: '900',
     textAlign: 'center',
-    width: '100%',
+    width: 28,
     fontFamily: 'System',
+    padding: 0,
+  },
+  timeColon: {
+    color: '#555555',
+    fontSize: 16,
+    fontWeight: '900',
+    marginHorizontal: 2,
+  },
+  ampmButton: {
+    backgroundColor: '#222222',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginLeft: 6,
+    minWidth: 36,
+    alignItems: 'center',
+  },
+  ampmText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
   timeInputSeparator: {
     paddingHorizontal: 10,
