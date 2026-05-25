@@ -135,7 +135,9 @@ export default function DashboardScreen() {
         const activeBlocked = TouchGrass.getActiveBlockedPackage();
         if (activeBlocked) {
           setIsCheckingLock(true);
-          router.replace('/lockscreen');
+          setTimeout(() => {
+            router.replace('/lockscreen');
+          }, 0);
           return;
         }
       }
@@ -152,7 +154,9 @@ export default function DashboardScreen() {
           const activeBlocked = TouchGrass.getActiveBlockedPackage();
           if (activeBlocked) {
             setIsCheckingLock(true);
-            router.replace('/lockscreen');
+            setTimeout(() => {
+              router.replace('/lockscreen');
+            }, 0);
             return;
           }
         }

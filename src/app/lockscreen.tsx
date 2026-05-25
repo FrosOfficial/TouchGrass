@@ -119,7 +119,9 @@ export default function LockScreen() {
         const active = isCurrentLockActive();
         if (!active) {
           TouchGrass.clearActiveBlockedPackage();
-          router.replace('/(tabs)');
+          setTimeout(() => {
+            router.replace('/(tabs)');
+          }, 0);
         }
       }
     }, 1000);
