@@ -116,7 +116,6 @@ Never break character. Never use pleasantries. No em dashes in your response sen
     } catch (e) {
       console.warn("Pollinations AI request failed, falling back to offline static engine:", e);
     }
-  }
 
   // 3. Offline Fallback / Default Mode
   return runOfflineHumorEngine(lowercaseExcuse);
