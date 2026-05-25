@@ -68,6 +68,7 @@ export default function LockScreen() {
   
   // App context
   const [blockedApp, setBlockedApp] = useState('');
+  const [lockUntil, setLockUntil] = useState(0);
   
   // Excuse negotiation states
   const [excuse, setExcuse] = useState('');
@@ -116,6 +117,9 @@ export default function LockScreen() {
 
     const interval = setInterval(() => {
       if (Platform.OS === 'android') {
+        const state = TouchGrass.getLockState();
+        setLockUntil(state.lockUntil);
+
         const active = isCurrentLockActive();
         if (!active) {
           TouchGrass.clearActiveBlockedPackage();
@@ -287,6 +291,14 @@ export default function LockScreen() {
 
   const accentColor = getThemeColor();
 
+  const getPenaltyStr = () => {
+    if (lockUntil <= Date.now()) return '';
+    const diff = lockUntil - Date.now();
+    const mins = Math.floor(diff / (60 * 1000));
+    const secs = Math.floor((diff % (60 * 1000)) / 1000);
+    return `AI PENALTY EXTENSION: ${mins}m ${secs}s`;
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Intimidating red flash panel */}
@@ -311,6 +323,11 @@ export default function LockScreen() {
             <View style={styles.headerTextWrapper}>
               <Text style={[styles.headerTitle, { color: accentColor }]}>ACCESS DENIED</Text>
               <Text style={styles.headerSubtitle}>{blockedApp} IS LOCKED DOWN</Text>
+              {lockUntil > Date.now() && (
+                <Text style={[styles.penaltySubtitle, { color: accentColor }]}>
+                  {getPenaltyStr()}
+                </Text>
+              )}
             </View>
           </View>
 
@@ -614,5 +631,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontSize: 11,
     letterSpacing: 1.5,
+  },
+  penaltySubtitle: {
+    fontSize: 10,
+    fontWeight: '900',
+    marginTop: 4,
+    letterSpacing: 1,
   },
 });

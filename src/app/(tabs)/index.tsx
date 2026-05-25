@@ -234,6 +234,19 @@ export default function DashboardScreen() {
 
   const ai = getAiAvatar();
 
+  const getRemainingTimeStr = () => {
+    if (lockUntil <= Date.now()) return '';
+    const diff = lockUntil - Date.now();
+    const hrs = Math.floor(diff / (3600 * 1000));
+    const mins = Math.floor((diff % (3600 * 1000)) / (60 * 1000));
+    const secs = Math.floor((diff % (60 * 1000)) / 1000);
+    
+    if (hrs > 0) {
+      return `LOCKED: ${hrs}h ${mins}m`;
+    }
+    return `PENALTY: ${mins}m ${secs}s`;
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {isCheckingLock ? (
@@ -292,6 +305,11 @@ export default function DashboardScreen() {
                 <Text style={styles.dialDetail}>
                   {isLocked ? `${blockedCount} APPS BLOCKED` : 'READY FOR SHIELD'}
                 </Text>
+                {lockUntil > Date.now() && (
+                  <Text style={[styles.dialCountdown, { color: '#FF3B30' }]}>
+                    {getRemainingTimeStr()}
+                  </Text>
+                )}
               </View>
             </View>
           </View>
@@ -465,6 +483,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     marginTop: 4,
+    letterSpacing: 1,
+  },
+  dialCountdown: {
+    fontSize: 12,
+    fontWeight: '900',
+    marginTop: 6,
     letterSpacing: 1,
   },
   statsGrid: {
