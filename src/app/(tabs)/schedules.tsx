@@ -79,35 +79,18 @@ export default function SchedulesScreen() {
 
     // Sync to background service if enabled!
     if (Platform.OS === 'android') {
-      const activeState = TouchGrass.getLockState();
-      
-      if (enabled) {
-        // If global time block is enabled, calculate current lock parameters
-        const now = new Date();
-        const [startH, startM] = start.split(':').map(Number);
-        const [endH, endM] = end.split(':').map(Number);
-
-        const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), startH, startM);
-        const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), endH, endM);
-
-        // Adjust if end time is next day
-        if (endDate <= startDate) {
-          endDate.setDate(endDate.getDate() + 1);
-        }
-
-        const isCurrentlyInLockWindow = now >= startDate && now <= endDate;
-        if (isCurrentlyInLockWindow) {
-          // If we are currently within the locked window, activate native lock until window ends!
-          const schedules = DB.getSchedules();
-          const activePackages = schedules.filter(s => s.is_enabled).map(s => s.app_package).join(',');
-          
-          TouchGrass.updateLockState(true, endDate.getTime(), activePackages);
-        } else {
-          // Outside window, disable active lock
-          const schedules = DB.getSchedules();
-          const activePackages = schedules.filter(s => s.is_enabled).map(s => s.app_package).join(',');
-          TouchGrass.updateLockState(false, 0, activePackages);
-        }
+      try {
+        const schedules = DB.getSchedules();
+        const activePackages = schedules.filter(s => s.is_enabled).map(s => s.app_package).join(',');
+        
+        // Sync global settings
+        TouchGrass.updateGlobalLockSettings(enabled, start, end);
+        
+        // Sync active packages and preserve the manual lock state
+        const activeState = TouchGrass.getLockState();
+        TouchGrass.updateLockState(activeState.isLocked, activeState.lockUntil, activePackages);
+      } catch (e) {
+        console.error("Failed to sync global lock settings natively:", e);
       }
     }
   };

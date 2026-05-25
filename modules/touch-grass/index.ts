@@ -34,6 +34,10 @@ export function updateLockState(isLocked: boolean, lockUntilMs: number, blockedP
   TouchGrassModule.updateLockState(isLocked, lockUntilMs, blockedPackages);
 }
 
+export function updateGlobalLockSettings(enabled: boolean, start: string, end: string): void {
+  TouchGrassModule.updateGlobalLockSettings(enabled, start, end);
+}
+
 export function getLockState(): LockState {
   return TouchGrassModule.getLockState();
 }

@@ -82,6 +82,16 @@ class TouchGrassModule : Module() {
       }
     }
 
+    Function("updateGlobalLockSettings") { enabled: Boolean, start: String, end: String ->
+      val prefs = context.getSharedPreferences("TouchGrassPrefs", Context.MODE_PRIVATE)
+      prefs.edit().apply {
+        putBoolean("global_lock_enabled", enabled)
+        putString("global_lock_start", start)
+        putString("global_lock_end", end)
+        apply()
+      }
+    }
+
     Function("getLockState") {
       val prefs = context.getSharedPreferences("TouchGrassPrefs", Context.MODE_PRIVATE)
       mapOf<String, Any>(

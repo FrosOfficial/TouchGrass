@@ -139,10 +139,8 @@ export default function AppsScreen() {
         setTimeout(() => {
           try {
             const activeState = TouchGrass.getLockState();
-            if (activeState.isLocked) {
-              const activePackages = updated.filter(a => a.isSelected).map(a => a.packageName).join(',');
-              TouchGrass.updateLockState(true, activeState.lockUntil, activePackages);
-            }
+            const activePackages = updated.filter(a => a.isSelected).map(a => a.packageName).join(',');
+            TouchGrass.updateLockState(activeState.isLocked, activeState.lockUntil, activePackages);
           } catch (e) {
             console.error("Failed to sync lock state natively:", e);
           }
