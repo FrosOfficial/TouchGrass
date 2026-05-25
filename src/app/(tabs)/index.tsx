@@ -192,104 +192,104 @@ export default function DashboardScreen() {
 
   const ai = getAiAvatar();
 
-  if (isCheckingLock) {
-    return <View style={{ flex: 1, backgroundColor: '#0D0D0D' }} />;
-  }
-
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>TOUCHGRASS</Text>
-          <TouchableOpacity onPress={loadData} style={styles.refreshButton}>
-            <RefreshCw color="#FFFFFF" size={16} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Permission Alerts */}
-        {(!accessibilityEnabled || !overlayGranted) && (
-          <TouchableOpacity 
-            style={styles.permissionAlert} 
-            onPress={() => router.push('/settings')}
-          >
-            <AlertTriangle color="#FF3B30" size={20} />
-            <View style={styles.permissionTextContainer}>
-              <Text style={styles.permissionAlertTitle}>SYSTEM BYPASSED</Text>
-              <Text style={styles.permissionAlertDesc}>Native services offline. Tap here to configure permissions.</Text>
-            </View>
-          </TouchableOpacity>
-        )}
-
-        {/* AI Character Console */}
-        <View style={[styles.aiConsole, { borderColor: ai.color }]}>
-          <View style={styles.aiHeader}>
-            <Text style={[styles.aiEmoji, { color: ai.color }]}>{ai.emoji}</Text>
-            <View>
-              <Text style={styles.aiName}>{ai.name}</Text>
-              <Text style={styles.aiStatusLabel}>CURRENT MOOD: {aiMood.toUpperCase()}</Text>
-            </View>
+      {isCheckingLock ? (
+        <View style={{ flex: 1, backgroundColor: '#0D0D0D' }} />
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>TOUCHGRASS</Text>
+            <TouchableOpacity onPress={loadData} style={styles.refreshButton}>
+              <RefreshCw color="#FFFFFF" size={16} />
+            </TouchableOpacity>
           </View>
-          <Text style={styles.aiRoastText}>"{latestRoast}"</Text>
-        </View>
 
-        {/* Lock Shield Dial */}
-        <View style={styles.dialContainer}>
-          <View style={[
-            styles.outerDial, 
-            { borderColor: isLocked ? '#FF3B30' : '#00C7FC' }
-          ]}>
-            <View style={styles.innerDial}>
-              {isLocked ? (
-                <ShieldAlert color="#FF3B30" size={64} />
-              ) : (
-                <Shield color="#00C7FC" size={64} />
-              )}
-              <Text style={[styles.dialStatus, { color: isLocked ? '#FF3B30' : '#00C7FC' }]}>
-                {isLocked ? 'SHIELD ON' : 'SHIELD OFF'}
-              </Text>
-              <Text style={styles.dialDetail}>
-                {isLocked ? `${blockedCount} APPS BLOCKED` : 'READY FOR SHIELD'}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Quick Stats Grid */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Text style={styles.statVal}>{blockedCount}</Text>
-            <Text style={styles.statLabel}>Restricted Apps</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={[styles.statVal, { color: consequenceLevel > 0 ? '#FF3B30' : '#FFFFFF' }]}>
-              {consequenceLevel}
-            </Text>
-            <Text style={styles.statLabel}>Excuse Strikes</Text>
-          </View>
-        </View>
-
-        {/* Main Action Button */}
-        <TouchableOpacity 
-          style={[
-            styles.actionButton, 
-            { backgroundColor: isLocked ? '#FF3B30' : '#00C7FC' }
-          ]} 
-          onPress={toggleShield}
-        >
-          {isLocked ? (
-            <>
-              <Square color="#FFFFFF" size={20} fill="#FFFFFF" />
-              <Text style={styles.actionButtonText}>NEGOTIATE DISABLE</Text>
-            </>
-          ) : (
-            <>
-              <Play color="#FFFFFF" size={20} fill="#FFFFFF" />
-              <Text style={styles.actionButtonText}>LOCK APPS NOW</Text>
-            </>
+          {/* Permission Alerts */}
+          {(!accessibilityEnabled || !overlayGranted) && (
+            <TouchableOpacity 
+              style={styles.permissionAlert} 
+              onPress={() => router.push('/settings')}
+            >
+              <AlertTriangle color="#FF3B30" size={20} />
+              <View style={styles.permissionTextContainer}>
+                <Text style={styles.permissionAlertTitle}>SYSTEM BYPASSED</Text>
+                <Text style={styles.permissionAlertDesc}>Native services offline. Tap here to configure permissions.</Text>
+              </View>
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
-      </ScrollView>
+
+          {/* AI Character Console */}
+          <View style={[styles.aiConsole, { borderColor: ai.color }]}>
+            <View style={styles.aiHeader}>
+              <Text style={[styles.aiEmoji, { color: ai.color }]}>{ai.emoji}</Text>
+              <View>
+                <Text style={styles.aiName}>{ai.name}</Text>
+                <Text style={styles.aiStatusLabel}>CURRENT MOOD: {aiMood.toUpperCase()}</Text>
+              </View>
+            </View>
+            <Text style={styles.aiRoastText}>"{latestRoast}"</Text>
+          </View>
+
+          {/* Lock Shield Dial */}
+          <View style={styles.dialContainer}>
+            <View style={[
+              styles.outerDial, 
+              { borderColor: isLocked ? '#FF3B30' : '#00C7FC' }
+            ]}>
+              <View style={styles.innerDial}>
+                {isLocked ? (
+                  <ShieldAlert color="#FF3B30" size={64} />
+                ) : (
+                  <Shield color="#00C7FC" size={64} />
+                )}
+                <Text style={[styles.dialStatus, { color: isLocked ? '#FF3B30' : '#00C7FC' }]}>
+                  {isLocked ? 'SHIELD ON' : 'SHIELD OFF'}
+                </Text>
+                <Text style={styles.dialDetail}>
+                  {isLocked ? `${blockedCount} APPS BLOCKED` : 'READY FOR SHIELD'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Quick Stats Grid */}
+          <View style={styles.statsGrid}>
+            <View style={styles.statCard}>
+              <Text style={styles.statVal}>{blockedCount}</Text>
+              <Text style={styles.statLabel}>Restricted Apps</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={[styles.statVal, { color: consequenceLevel > 0 ? '#FF3B30' : '#FFFFFF' }]}>
+                {consequenceLevel}
+              </Text>
+              <Text style={styles.statLabel}>Excuse Strikes</Text>
+            </View>
+          </View>
+
+          {/* Main Action Button */}
+          <TouchableOpacity 
+            style={[
+              styles.actionButton, 
+              { backgroundColor: isLocked ? '#FF3B30' : '#00C7FC' }
+            ]} 
+            onPress={toggleShield}
+          >
+            {isLocked ? (
+              <>
+                <Square color="#FFFFFF" size={20} fill="#FFFFFF" />
+                <Text style={styles.actionButtonText}>NEGOTIATE DISABLE</Text>
+              </>
+            ) : (
+              <>
+                <Play color="#FFFFFF" size={20} fill="#FFFFFF" />
+                <Text style={styles.actionButtonText}>LOCK APPS NOW</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
