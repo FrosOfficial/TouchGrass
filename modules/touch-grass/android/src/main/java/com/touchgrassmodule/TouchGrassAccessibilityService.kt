@@ -9,57 +9,88 @@ import java.util.Calendar
 
 class TouchGrassAccessibilityService : AccessibilityService() {
 
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var lastSeenPackage: String? = null
+
+    private val checkRunnable = object : Runnable {
+        override fun run() {
+            try {
+                val rootNode = rootInActiveWindow
+                val activePackage = rootNode?.packageName?.toString() ?: lastSeenPackage
+                if (activePackage != null) {
+                    checkAndRedirectIfNeeded(activePackage)
+                }
+            } catch (e: Exception) {
+                Log.e("TouchGrassShield", "Error in periodic background check", e)
+            }
+            handler.postDelayed(this, 500)
+        }
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
 
-        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            val packageName = event.packageName?.toString() ?: return
+        val packageName = event.packageName?.toString()
+        if (packageName != null && packageName != "com.touchgrass" && packageName != "com.android.systemui" && packageName != "com.android.settings") {
+            lastSeenPackage = packageName
+        }
+
+        val eventType = event.eventType
+        if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || 
+            eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
+            eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED ||
+            eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
             
-            // Bypass ourselves and standard system UI elements
-            if (packageName == "com.touchgrass" || packageName == "com.android.systemui" || packageName == "com.android.settings") {
-                return
-            }
+            val eventPackage = event.packageName?.toString() ?: return
+            checkAndRedirectIfNeeded(eventPackage)
+        }
+    }
 
-            val prefs = getSharedPreferences("TouchGrassPrefs", Context.MODE_PRIVATE)
-            val isLocked = prefs.getBoolean("is_locked", false)
-            val lockUntil = prefs.getLong("lock_until", 0L)
-            val currentTime = System.currentTimeMillis()
+    private fun checkAndRedirectIfNeeded(packageName: String) {
+        // Bypass ourselves and standard system UI elements
+        if (packageName == "com.touchgrass" || packageName == "com.android.systemui" || packageName == "com.android.settings") {
+            return
+        }
 
-            // Check if manual lock is active
-            var activeLock = isLocked && (lockUntil > currentTime)
+        val prefs = getSharedPreferences("TouchGrassPrefs", Context.MODE_PRIVATE)
+        val isLocked = prefs.getBoolean("is_locked", false)
+        val lockUntil = prefs.getLong("lock_until", 0L)
+        val currentTime = System.currentTimeMillis()
 
-            // If not active, check if global lockdown window is active
-            if (!activeLock) {
-                val globalEnabled = prefs.getBoolean("global_lock_enabled", false)
-                if (globalEnabled) {
-                    val startStr = prefs.getString("global_lock_start", "") ?: ""
-                    val endStr = prefs.getString("global_lock_end", "") ?: ""
-                    if (startStr.isNotEmpty() && endStr.isNotEmpty()) {
-                        if (isCurrentTimeInWindow(startStr, endStr)) {
-                            activeLock = true
-                        }
+        // Check if manual lock is active
+        var activeLock = isLocked && (lockUntil > currentTime)
+
+        // If not active, check if global lockdown window is active
+        if (!activeLock) {
+            val globalEnabled = prefs.getBoolean("global_lock_enabled", false)
+            if (globalEnabled) {
+                val startStr = prefs.getString("global_lock_start", "") ?: ""
+                val endStr = prefs.getString("global_lock_end", "") ?: ""
+                if (startStr.isNotEmpty() && endStr.isNotEmpty()) {
+                    if (isCurrentTimeInWindow(startStr, endStr)) {
+                        activeLock = true
                     }
                 }
             }
+        }
 
-            if (activeLock) {
-                val blockedPackagesString = prefs.getString("blocked_packages", "") ?: ""
-                val blockedPackages = blockedPackagesString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        if (activeLock) {
+            val blockedPackagesString = prefs.getString("blocked_packages", "") ?: ""
+            val blockedPackages = blockedPackagesString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
 
-                if (blockedPackages.contains(packageName)) {
-                    Log.d("TouchGrassShield", "Intercepted unauthorized launch: $packageName")
+            if (blockedPackages.contains(packageName)) {
+                Log.d("TouchGrassShield", "Intercepted unauthorized launch: $packageName")
+                
+                // Redirect to TouchGrass launcher activity
+                val launchIntent = packageManager.getLaunchIntentForPackage("com.touchgrass")
+                if (launchIntent != null) {
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                    launchIntent.putExtra("blocked_package", packageName)
                     
-                    // Redirect to TouchGrass launcher activity
-                    val launchIntent = packageManager.getLaunchIntentForPackage("com.touchgrass")
-                    if (launchIntent != null) {
-                        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                        launchIntent.putExtra("blocked_package", packageName)
-                        
-                        // Save the triggered blocked package in preferences so React Native can query it
-                        prefs.edit().putString("active_blocked_package", packageName).apply()
-                        
-                        startActivity(launchIntent)
-                    }
+                    // Save the triggered blocked package in preferences so React Native can query it
+                    prefs.edit().putString("active_blocked_package", packageName).apply()
+                    
+                    startActivity(launchIntent)
                 }
             }
         }
@@ -103,5 +134,11 @@ class TouchGrassAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.d("TouchGrassShield", "Service Connected and Monitoring Packages")
+        handler.post(checkRunnable)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        handler.removeCallbacks(checkRunnable)
     }
 }

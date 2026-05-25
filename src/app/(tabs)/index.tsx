@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Dimensions } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Dimensions, AppState, AppStateStatus } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Shield, ShieldAlert, Skull, Play, Square, AlertTriangle, RefreshCw } from 'lucide-react-native';
@@ -134,6 +134,28 @@ export default function DashboardScreen() {
       loadData();
     }, [loadData])
   );
+
+  // Sync state and run lockout check immediately when returning from background
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        if (Platform.OS === 'android') {
+          const activeBlocked = TouchGrass.getActiveBlockedPackage();
+          if (activeBlocked) {
+            setIsCheckingLock(true);
+            router.replace('/lockscreen');
+            return;
+          }
+        }
+        loadData();
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      subscription.remove();
+    };
+  }, [loadData]);
 
   const toggleShield = () => {
     if (!accessibilityEnabled || !overlayGranted) {
