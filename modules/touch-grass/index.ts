@@ -35,7 +35,11 @@ export function updateLockState(isLocked: boolean, lockUntilMs: number, blockedP
 }
 
 export function updateGlobalLockSettings(enabled: boolean, start: string, end: string): void {
-  TouchGrassModule.updateGlobalLockSettings(enabled, start, end);
+  if (TouchGrassModule && typeof TouchGrassModule.updateGlobalLockSettings === 'function') {
+    TouchGrassModule.updateGlobalLockSettings(enabled, start, end);
+  } else {
+    console.warn("updateGlobalLockSettings is not available in the current native build. Please rebuild your development client APK.");
+  }
 }
 
 export function getLockState(): LockState {
