@@ -229,11 +229,11 @@ export default function SchedulesScreen() {
                 {/* Hours Spinner */}
                 <View style={styles.dialColumn}>
                   <TouchableOpacity onPress={() => adjustTime('start', 'hours', 1)} style={styles.arrowBtn}>
-                    <ChevronUp color="#00C7FC" size={14} />
+                    <ChevronUp color="#00C7FC" size={22} />
                   </TouchableOpacity>
                   <Text style={styles.timeDigit}>{start12.hours.padStart(2, '0')}</Text>
                   <TouchableOpacity onPress={() => adjustTime('start', 'hours', -1)} style={styles.arrowBtn}>
-                    <ChevronDown color="#00C7FC" size={14} />
+                    <ChevronDown color="#00C7FC" size={22} />
                   </TouchableOpacity>
                 </View>
                 
@@ -242,11 +242,11 @@ export default function SchedulesScreen() {
                 {/* Minutes Spinner */}
                 <View style={styles.dialColumn}>
                   <TouchableOpacity onPress={() => adjustTime('start', 'minutes', 1)} style={styles.arrowBtn}>
-                    <ChevronUp color="#00C7FC" size={14} />
+                    <ChevronUp color="#00C7FC" size={22} />
                   </TouchableOpacity>
                   <Text style={styles.timeDigit}>{start12.minutes}</Text>
                   <TouchableOpacity onPress={() => adjustTime('start', 'minutes', -1)} style={styles.arrowBtn}>
-                    <ChevronDown color="#00C7FC" size={14} />
+                    <ChevronDown color="#00C7FC" size={22} />
                   </TouchableOpacity>
                 </View>
 
@@ -269,11 +269,11 @@ export default function SchedulesScreen() {
                 {/* Hours Spinner */}
                 <View style={styles.dialColumn}>
                   <TouchableOpacity onPress={() => adjustTime('end', 'hours', 1)} style={styles.arrowBtn}>
-                    <ChevronUp color="#00C7FC" size={14} />
+                    <ChevronUp color="#00C7FC" size={22} />
                   </TouchableOpacity>
                   <Text style={styles.timeDigit}>{end12.hours.padStart(2, '0')}</Text>
                   <TouchableOpacity onPress={() => adjustTime('end', 'hours', -1)} style={styles.arrowBtn}>
-                    <ChevronDown color="#00C7FC" size={14} />
+                    <ChevronDown color="#00C7FC" size={22} />
                   </TouchableOpacity>
                 </View>
                 
@@ -282,11 +282,11 @@ export default function SchedulesScreen() {
                 {/* Minutes Spinner */}
                 <View style={styles.dialColumn}>
                   <TouchableOpacity onPress={() => adjustTime('end', 'minutes', 1)} style={styles.arrowBtn}>
-                    <ChevronUp color="#00C7FC" size={14} />
+                    <ChevronUp color="#00C7FC" size={22} />
                   </TouchableOpacity>
                   <Text style={styles.timeDigit}>{end12.minutes}</Text>
                   <TouchableOpacity onPress={() => adjustTime('end', 'minutes', -1)} style={styles.arrowBtn}>
-                    <ChevronDown color="#00C7FC" size={14} />
+                    <ChevronDown color="#00C7FC" size={22} />
                   </TouchableOpacity>
                 </View>
 
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#0A0A0A',
-    padding: 12,
+    padding: 8,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#1E1E1E',
@@ -440,74 +440,78 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   timeLabel: {
-    color: '#555555',
-    fontSize: 9,
+    color: '#888888',
+    fontSize: 10,
     fontWeight: '900',
     letterSpacing: 1,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   timePickerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#151515',
     borderWidth: 1,
     borderColor: '#222222',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    height: 64,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    height: 90,
   },
   dialColumn: {
     alignItems: 'center',
     justifyContent: 'center',
+    width: 40,
   },
   timeDigit: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 26,
     fontWeight: '900',
     textAlign: 'center',
-    width: 24,
+    width: 36,
     fontFamily: 'System',
-    lineHeight: 18,
+    lineHeight: 28,
   },
   arrowBtn: {
-    paddingVertical: 1,
-    paddingHorizontal: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   timeColon: {
     color: '#555555',
-    fontSize: 16,
+    fontSize: 24,
     fontWeight: '900',
-    marginHorizontal: 2,
+    marginHorizontal: 1,
     alignSelf: 'center',
   },
   ampmButton: {
     backgroundColor: '#222222',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+    paddingVertical: 10,
+    borderRadius: 6,
     marginLeft: 6,
-    minWidth: 36,
+    minWidth: 42,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   ampmText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
   timeInputSeparator: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 6,
   },
   separatorText: {
-    color: '#333333',
+    color: '#444444',
     fontWeight: '900',
-    fontSize: 11,
+    fontSize: 10,
   },
   timeTip: {
     color: '#555555',
     fontSize: 10,
-    marginTop: 10,
+    marginTop: 12,
     textAlign: 'center',
   },
   sectionTitle: {
