@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Animated, KeyboardAvoidingView, Platform, Dimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Animated, KeyboardAvoidingView, Platform, Dimensions, Alert, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Skull, AlertTriangle, Send, ShieldAlert, Sparkles } from 'lucide-react-native';
@@ -30,9 +30,35 @@ export default function LockScreen() {
   // AI Appearance
   const [aiMood, setAiMood] = useState('sarcastic');
 
+  const handleGiveUp = () => {
+    if (Platform.OS === 'android') {
+      TouchGrass.clearActiveBlockedPackage();
+      try {
+        if (typeof TouchGrass.exitToHomeScreen === 'function') {
+          TouchGrass.exitToHomeScreen();
+        }
+      } catch (e) {
+        // Fallback
+      }
+    }
+    router.replace('/(tabs)');
+  };
+
   useEffect(() => {
     loadActiveBlockedPackage();
     loadChatHistory();
+
+    const backAction = () => {
+      handleGiveUp();
+      return true;
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction
+    );
+
+    return () => backHandler.remove();
   }, []);
 
   const loadActiveBlockedPackage = () => {
@@ -308,7 +334,7 @@ export default function LockScreen() {
           {/* Emergency bypass info */}
           <TouchableOpacity 
             style={styles.cancelLink}
-            onPress={() => router.replace('/(tabs)')}
+            onPress={handleGiveUp}
           >
             <Text style={styles.cancelLinkText}>GIVE UP & BACK TO SAFETY</Text>
           </TouchableOpacity>

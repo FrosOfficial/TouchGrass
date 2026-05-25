@@ -101,6 +101,14 @@ class TouchGrassModule : Module() {
       prefs.edit().remove("active_blocked_package").apply()
     }
 
+    Function("exitToHomeScreen") {
+      val intent = Intent(Intent.ACTION_MAIN).apply {
+        addCategory(Intent.CATEGORY_HOME)
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+      }
+      context.startActivity(intent)
+    }
+
     Function("getInstalledApps") {
       val pm = context.packageManager
       val intent = Intent(Intent.ACTION_MAIN, null).apply {

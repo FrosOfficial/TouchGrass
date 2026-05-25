@@ -49,3 +49,7 @@ export function clearActiveBlockedPackage(): void {
 export function getInstalledApps(): InstalledApp[] {
   return TouchGrassModule.getInstalledApps();
 }
+
+export function exitToHomeScreen(): void {
+  TouchGrassModule.exitToHomeScreen();
+}

@@ -12,6 +12,59 @@ interface DisplayApp {
   isSelected: boolean;
 }
 
+let cachedInstalledApps: TouchGrass.InstalledApp[] | null = null;
+
+export function preloadInstalledApps() {
+  if (Platform.OS === 'android' && !cachedInstalledApps) {
+    setTimeout(() => {
+      try {
+        cachedInstalledApps = TouchGrass.getInstalledApps();
+      } catch (e) {
+        console.error("Error preloading apps:", e);
+      }
+    }, 100);
+  }
+}
+
+const AppItem = React.memo(({ item, onSelect }: { item: DisplayApp; onSelect: (packageName: string) => void }) => {
+  return (
+    <TouchableOpacity 
+      style={[
+        styles.appCard,
+        item.isSelected && styles.appCardSelected
+      ]}
+      onPress={() => onSelect(item.packageName)}
+      activeOpacity={0.7}
+    >
+      {/* App Icon */}
+      {item.iconBase64 ? (
+        <Image 
+          source={{ uri: `data:image/png;base64,${item.iconBase64}` }}
+          style={styles.appIcon}
+        />
+      ) : (
+        <View style={styles.appIconPlaceholder}>
+          <ShieldAlert color="#555555" size={20} />
+        </View>
+      )}
+
+      {/* App Details */}
+      <View style={styles.appInfo}>
+        <Text style={styles.appLabel}>{item.label}</Text>
+        <Text style={styles.appPackage} numberOfLines={1}>{item.packageName}</Text>
+      </View>
+
+      {/* Checkbox Indicator */}
+      <View style={[
+        styles.checkbox,
+        item.isSelected && styles.checkboxSelected
+      ]}>
+        {item.isSelected && <Check color="#FFFFFF" size={14} strokeWidth={3} />}
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 export default function AppsScreen() {
   const [apps, setApps] = useState<DisplayApp[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,7 +79,12 @@ export default function AppsScreen() {
     try {
       let installedApps: TouchGrass.InstalledApp[] = [];
       if (Platform.OS === 'android') {
-        installedApps = TouchGrass.getInstalledApps();
+        if (cachedInstalledApps) {
+          installedApps = cachedInstalledApps;
+        } else {
+          installedApps = TouchGrass.getInstalledApps();
+          cachedInstalledApps = installedApps;
+        }
       } else {
         // Mock data for non-Android design testing
         installedApps = [
@@ -58,34 +116,42 @@ export default function AppsScreen() {
     }
   };
 
-  const toggleAppSelection = (packageName: string) => {
-    const updated = apps.map(app => {
-      if (app.packageName === packageName) {
-        const nextSelected = !app.isSelected;
-        
-        // Update database schedule
-        if (nextSelected) {
-          DB.addOrUpdateSchedule(packageName, "00:00", "23:59", true);
-        } else {
-          DB.deleteSchedule(packageName);
+  const toggleAppSelection = useCallback((packageName: string) => {
+    setApps(prevApps => {
+      const updated = prevApps.map(app => {
+        if (app.packageName === packageName) {
+          const nextSelected = !app.isSelected;
+          
+          // Update database schedule
+          if (nextSelected) {
+            DB.addOrUpdateSchedule(packageName, "00:00", "23:59", true);
+          } else {
+            DB.deleteSchedule(packageName);
+          }
+          
+          return { ...app, isSelected: nextSelected };
         }
-        
-        return { ...app, isSelected: nextSelected };
+        return app;
+      });
+
+      // Sync state to native SharedPreferences asynchronously to prevent UI lag
+      if (Platform.OS === 'android') {
+        setTimeout(() => {
+          try {
+            const activeState = TouchGrass.getLockState();
+            if (activeState.isLocked) {
+              const activePackages = updated.filter(a => a.isSelected).map(a => a.packageName).join(',');
+              TouchGrass.updateLockState(true, activeState.lockUntil, activePackages);
+            }
+          } catch (e) {
+            console.error("Failed to sync lock state natively:", e);
+          }
+        }, 10);
       }
-      return app;
+
+      return updated;
     });
-
-    setApps(updated);
-
-    // Sync state to native SharedPreferences immediately if lock is active
-    if (Platform.OS === 'android') {
-      const activeState = TouchGrass.getLockState();
-      if (activeState.isLocked) {
-        const activePackages = updated.filter(a => a.isSelected).map(a => a.packageName).join(',');
-        TouchGrass.updateLockState(true, activeState.lockUntil, activePackages);
-      }
-    }
-  };
+  }, []);
 
   const filteredApps = apps.filter(app => 
     app.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -127,41 +193,13 @@ export default function AppsScreen() {
         <FlatList
           data={filteredApps}
           keyExtractor={item => item.packageName}
+          initialNumToRender={12}
+          maxToRenderPerBatch={8}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS === 'android'}
+          updateCellsBatchingPeriod={50}
           renderItem={({ item }) => (
-            <TouchableOpacity 
-              style={[
-                styles.appCard,
-                item.isSelected && styles.appCardSelected
-              ]}
-              onPress={() => toggleAppSelection(item.packageName)}
-              activeOpacity={0.7}
-            >
-              {/* App Icon */}
-              {item.iconBase64 ? (
-                <Image 
-                  source={{ uri: `data:image/png;base64,${item.iconBase64}` }}
-                  style={styles.appIcon}
-                />
-              ) : (
-                <View style={styles.appIconPlaceholder}>
-                  <ShieldAlert color="#555555" size={20} />
-                </View>
-              )}
-
-              {/* App Details */}
-              <View style={styles.appInfo}>
-                <Text style={styles.appLabel}>{item.label}</Text>
-                <Text style={styles.appPackage} numberOfLines={1}>{item.packageName}</Text>
-              </View>
-
-              {/* Checkbox Indicator */}
-              <View style={[
-                styles.checkbox,
-                item.isSelected && styles.checkboxSelected
-              ]}>
-                {item.isSelected && <Check color="#FFFFFF" size={14} strokeWidth={3} />}
-              </View>
-            </TouchableOpacity>
+            <AppItem item={item} onSelect={toggleAppSelection} />
           )}
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={

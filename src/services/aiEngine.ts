@@ -96,7 +96,63 @@ Never break character. Never use pleasantries. No em dashes in your response sen
     }
   }
 
-  // 2. Offline Fallback / Default Mode
+  // 2. Keyless Online Mode (Pollinations AI)
+  if (!apiKey || apiKey.trim() === '') {
+    try {
+      const response = await fetch('https://text.pollinations.ai/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'system',
+              content: `You are TouchGrass, a highly skeptical, patronizing, and sarcastic productivity AI designed to break smartphone addiction.
+Your job is to evaluate the user's excuse for wanting to unlock their locked apps early.
+You must return a JSON object with the following fields:
+- "approved": boolean (Strictly false, unless they provide an absolute genuine emergency like "I need to call 911" or "My grandmother is in the hospital" - but even then, be extremely skeptical. 99% of excuses should be false).
+- "mood": "neutral" | "sarcastic" | "annoyed" | "angry" (Select based on how lazy, repetitive, or insulting their excuse is).
+- "response": string (A biting, cynical, highly humorous roast delivering the tough love. Keep it short, sharp, and insulting to their productivity).
+- "time_penalty_minutes": number (If rejected, add a penalty to their lock duration. Return 10, 15, 30, or 60 minutes based on how ridiculous their excuse is).
+
+Never break character. Never use pleasantries. No em dashes in your response sentences. Make sure to respond ONLY with raw JSON.`
+            },
+            {
+              role: 'user',
+              content: `My excuse is: "${excuse}"`
+            }
+          ],
+          jsonMode: true
+        })
+      });
+
+      if (response.ok) {
+        const text = await response.text();
+        const content = JSON.parse(text);
+        
+        // Update database with consequence level and mood
+        const consequenceString = getSetting('consequence_level');
+        let consequenceLevel = parseInt(consequenceString || '0', 10);
+        if (!content.approved) {
+          consequenceLevel += 1;
+          setSetting('consequence_level', consequenceLevel.toString());
+        }
+        setSetting('ai_mood', content.mood || 'sarcastic');
+
+        return {
+          approved: !!content.approved,
+          mood: content.mood || 'sarcastic',
+          response: content.response || "Denied. Put the phone away.",
+          time_penalty_minutes: Number(content.time_penalty_minutes) || 15
+        };
+      }
+    } catch (e) {
+      console.warn("Pollinations AI request failed, falling back to offline static engine:", e);
+    }
+  }
+
+  // 3. Offline Fallback / Default Mode
   return runOfflineHumorEngine(lowercaseExcuse);
 }
 
