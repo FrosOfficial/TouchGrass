@@ -33,6 +33,7 @@ export default function DashboardScreen() {
   const router = useRouter();
   const [isLocked, setIsLocked] = useState(false);
   const [lockUntil, setLockUntil] = useState(0);
+  const [currentTime, setCurrentTime] = useState(Date.now());
   const [blockedCount, setBlockedCount] = useState(0);
   const [isCheckingLock, setIsCheckingLock] = useState(true);
   
@@ -170,11 +171,12 @@ export default function DashboardScreen() {
     };
   }, [loadData]);
 
-  // Periodically reload dashboard state to auto-update when locks expire
+  // Periodically reload dashboard state to auto-update when locks expire and tick countdown
   useEffect(() => {
     const interval = setInterval(() => {
       loadData();
-    }, 2000);
+      setCurrentTime(Date.now());
+    }, 1000);
     return () => clearInterval(interval);
   }, [loadData]);
 
@@ -235,8 +237,8 @@ export default function DashboardScreen() {
   const ai = getAiAvatar();
 
   const getRemainingTimeStr = () => {
-    if (lockUntil <= Date.now()) return '';
-    const diff = lockUntil - Date.now();
+    if (lockUntil <= currentTime) return '';
+    const diff = lockUntil - currentTime;
     const hrs = Math.floor(diff / (3600 * 1000));
     const mins = Math.floor((diff % (3600 * 1000)) / (60 * 1000));
     const secs = Math.floor((diff % (60 * 1000)) / 1000);

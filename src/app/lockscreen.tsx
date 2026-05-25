@@ -69,6 +69,7 @@ export default function LockScreen() {
   // App context
   const [blockedApp, setBlockedApp] = useState('');
   const [lockUntil, setLockUntil] = useState(0);
+  const [currentTime, setCurrentTime] = useState(Date.now());
   
   // Excuse negotiation states
   const [excuse, setExcuse] = useState('');
@@ -119,6 +120,7 @@ export default function LockScreen() {
       if (Platform.OS === 'android') {
         const state = TouchGrass.getLockState();
         setLockUntil(state.lockUntil);
+        setCurrentTime(Date.now());
 
         const active = isCurrentLockActive();
         if (!active) {
@@ -257,9 +259,9 @@ export default function LockScreen() {
         if (Platform.OS === 'android') {
           const currentState = TouchGrass.getLockState();
           
-          // Calculate new duration = current limit + penalty time
+          // Calculate new duration = current limit + penalty time (For dev testing, set to exactly 5 seconds)
           const currentUntil = currentState.lockUntil > Date.now() ? currentState.lockUntil : Date.now();
-          const penaltyMs = evaluation.time_penalty_minutes * 60 * 1000;
+          const penaltyMs = 5 * 1000;
           const newLockUntil = currentUntil + penaltyMs;
           
           TouchGrass.updateLockState(true, newLockUntil, currentState.blockedPackages);
@@ -292,8 +294,8 @@ export default function LockScreen() {
   const accentColor = getThemeColor();
 
   const getPenaltyStr = () => {
-    if (lockUntil <= Date.now()) return '';
-    const diff = lockUntil - Date.now();
+    if (lockUntil <= currentTime) return '';
+    const diff = lockUntil - currentTime;
     const mins = Math.floor(diff / (60 * 1000));
     const secs = Math.floor((diff % (60 * 1000)) / 1000);
     return `AI PENALTY EXTENSION: ${mins}m ${secs}s`;
