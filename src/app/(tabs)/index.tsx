@@ -6,11 +6,35 @@ import { Shield, ShieldAlert, Skull, Play, Square, AlertTriangle, RefreshCw } fr
 import * as TouchGrass from 'touch-grass';
 import * as DB from '../../db/database';
 
+function isCurrentTimeInWindowJS(start: string, end: string): boolean {
+  try {
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    
+    const now = new Date();
+    const nowH = now.getHours();
+    const nowM = now.getMinutes();
+    
+    const startTimeMinutes = startH * 60 + startM;
+    const endTimeMinutes = endH * 60 + endM;
+    const nowTimeMinutes = nowH * 60 + nowM;
+    
+    if (endTimeMinutes > startTimeMinutes) {
+      return nowTimeMinutes >= startTimeMinutes && nowTimeMinutes <= endTimeMinutes;
+    } else {
+      return nowTimeMinutes >= startTimeMinutes || nowTimeMinutes <= endTimeMinutes;
+    }
+  } catch (e) {
+    return false;
+  }
+}
+
 export default function DashboardScreen() {
   const router = useRouter();
   const [isLocked, setIsLocked] = useState(false);
   const [lockUntil, setLockUntil] = useState(0);
   const [blockedCount, setBlockedCount] = useState(0);
+  const [isCheckingLock, setIsCheckingLock] = useState(true);
   
   // Permissions
   const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
@@ -49,14 +73,42 @@ export default function DashboardScreen() {
         setLatestRoast("Oh look, you haven't locked your phone yet. Ready to fail your productivity goals today?");
       }
 
-      // 4. Load native module lock state
+      // 4. Synchronize database schedules to native SharedPreferences and get current state
       if (Platform.OS === 'android') {
+        const schedules = DB.getSchedules();
+        const activePackages = schedules.filter(s => s.is_enabled).map(s => s.app_package).join(',');
+        
         const state = TouchGrass.getLockState();
-        setIsLocked(state.isLocked);
-        setLockUntil(state.lockUntil);
+        const now = Date.now();
+        
+        let targetLocked = state.isLocked;
+        let targetUntil = state.lockUntil;
+
+        // Reset manual lock if the timer finished
+        if (state.isLocked && state.lockUntil <= now) {
+          TouchGrass.updateLockState(false, 0, activePackages);
+          targetLocked = false;
+          targetUntil = 0;
+        } else {
+          // Always make sure latest active packages are synced to SharedPreferences
+          TouchGrass.updateLockState(state.isLocked, state.lockUntil, activePackages);
+        }
+
+        // Check if the Global Lockdown window is active in JS to show correctly in the UI
+        let isGlobalLocked = false;
+        const globalEnabled = DB.getSetting('global_lock_enabled') === 'true';
+        if (globalEnabled) {
+          const start = DB.getSetting('global_lock_start') || '09:00';
+          const end = DB.getSetting('global_lock_end') || '17:00';
+          isGlobalLocked = isCurrentTimeInWindowJS(start, end);
+        }
+
+        const isShieldActive = targetLocked || isGlobalLocked;
+        setIsLocked(isShieldActive);
+        setLockUntil(targetLocked ? targetUntil : 0);
         
         // Count blocked packages
-        const blockedArr = state.blockedPackages.split(',').map(s => s.trim()).filter(Boolean);
+        const blockedArr = activePackages.split(',').map(s => s.trim()).filter(Boolean);
         setBlockedCount(blockedArr.length);
       } else {
         // Mock for other platforms
@@ -67,17 +119,19 @@ export default function DashboardScreen() {
     }
   }, []);
 
+  // Instant bypass check on boot / focus
   useFocusEffect(
     useCallback(() => {
-      loadData();
-      
-      // Also check if any package was recently intercepted to trigger the negotiation modal
       if (Platform.OS === 'android') {
         const activeBlocked = TouchGrass.getActiveBlockedPackage();
         if (activeBlocked) {
-          router.push('/lockscreen');
+          setIsCheckingLock(true);
+          router.replace('/lockscreen');
+          return;
         }
       }
+      setIsCheckingLock(false);
+      loadData();
     }, [loadData])
   );
 
@@ -137,6 +191,10 @@ export default function DashboardScreen() {
   };
 
   const ai = getAiAvatar();
+
+  if (isCheckingLock) {
+    return <View style={{ flex: 1, backgroundColor: '#0D0D0D' }} />;
+  }
 
   return (
     <SafeAreaView style={styles.container}>
