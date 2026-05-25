@@ -157,6 +157,14 @@ export default function DashboardScreen() {
     };
   }, [loadData]);
 
+  // Periodically reload dashboard state to auto-update when locks expire
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadData();
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [loadData]);
+
   const toggleShield = () => {
     if (!accessibilityEnabled || !overlayGranted) {
       // Direct user to Console tab to grant permissions

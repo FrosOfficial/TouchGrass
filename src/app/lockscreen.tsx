@@ -7,6 +7,56 @@ import * as TouchGrass from 'touch-grass';
 import * as DB from '../db/database';
 import { negotiateExcuse } from '../services/aiEngine';
 
+function isCurrentTimeInWindowJS(start: string, end: string): boolean {
+  try {
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    
+    const now = new Date();
+    const nowH = now.getHours();
+    const nowM = now.getMinutes();
+    
+    const startTimeMinutes = startH * 60 + startM;
+    const endTimeMinutes = endH * 60 + endM;
+    const nowTimeMinutes = nowH * 60 + nowM;
+    
+    if (endTimeMinutes > startTimeMinutes) {
+      return nowTimeMinutes >= startTimeMinutes && nowTimeMinutes <= endTimeMinutes;
+    } else {
+      return nowTimeMinutes >= startTimeMinutes || nowTimeMinutes <= endTimeMinutes;
+    }
+  } catch (e) {
+    return false;
+  }
+}
+
+function isCurrentLockActive(): boolean {
+  if (Platform.OS !== 'android') return false;
+  
+  try {
+    const state = TouchGrass.getLockState();
+    const now = Date.now();
+    
+    // Check manual lock
+    if (state.isLocked && state.lockUntil > now) {
+      return true;
+    }
+    
+    // Check global lock
+    const globalEnabled = DB.getSetting('global_lock_enabled') === 'true';
+    if (globalEnabled) {
+      const start = DB.getSetting('global_lock_start') || '09:00';
+      const end = DB.getSetting('global_lock_end') || '17:00';
+      if (isCurrentTimeInWindowJS(start, end)) {
+        return true;
+      }
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return false;
+}
+
 export default function LockScreen() {
   const router = useRouter();
   
@@ -58,7 +108,20 @@ export default function LockScreen() {
       backAction
     );
 
-    return () => backHandler.remove();
+    const interval = setInterval(() => {
+      if (Platform.OS === 'android') {
+        const active = isCurrentLockActive();
+        if (!active) {
+          TouchGrass.clearActiveBlockedPackage();
+          router.replace('/(tabs)');
+        }
+      }
+    }, 1000);
+
+    return () => {
+      backHandler.remove();
+      clearInterval(interval);
+    };
   }, []);
 
   const loadActiveBlockedPackage = () => {
