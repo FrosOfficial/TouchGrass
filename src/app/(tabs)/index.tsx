@@ -35,7 +35,6 @@ export default function DashboardScreen() {
   const [lockUntil, setLockUntil] = useState(0);
   const [blockedCount, setBlockedCount] = useState(0);
   const [isCheckingLock, setIsCheckingLock] = useState(true);
-  const [isTimerExpired, setIsTimerExpired] = useState(false);
   
   // Permissions
   const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
@@ -85,12 +84,15 @@ export default function DashboardScreen() {
         let targetLocked = state.isLocked;
         let targetUntil = state.lockUntil;
 
-        // Check if the timer has expired
-        const expired = state.isLocked && state.lockUntil <= now;
-        setIsTimerExpired(expired);
-
-        // Always make sure latest active packages are synced to SharedPreferences
-        TouchGrass.updateLockState(state.isLocked, state.lockUntil, activePackages);
+        // Reset manual lock if the timer finished
+        if (state.isLocked && state.lockUntil <= now) {
+          TouchGrass.updateLockState(false, 0, activePackages);
+          targetLocked = false;
+          targetUntil = 0;
+        } else {
+          // Always make sure latest active packages are synced to SharedPreferences
+          TouchGrass.updateLockState(state.isLocked, state.lockUntil, activePackages);
+        }
 
         // Check if the Global Lockdown window is active in JS to show correctly in the UI
         let isGlobalLocked = false;
@@ -141,25 +143,8 @@ export default function DashboardScreen() {
     }
 
     if (isLocked) {
-      if (isTimerExpired) {
-        // If manual lock is completed, let them disable it directly without negotiation!
-        if (Platform.OS === 'android') {
-          try {
-            const schedules = DB.getSchedules();
-            const activePackages = schedules.filter(s => s.is_enabled).map(s => s.app_package).join(',');
-            TouchGrass.updateLockState(false, 0, activePackages);
-          } catch (e) {
-            console.error("Failed to unlock natively:", e);
-          }
-        }
-        setIsLocked(false);
-        setLockUntil(0);
-        setIsTimerExpired(false);
-        loadData();
-      } else {
-        // Active manual lock or active global lock requires negotiation!
-        router.push('/lockscreen');
-      }
+      // Active manual lock or active global lock requires negotiation!
+      router.push('/lockscreen');
     } else {
       // Start the shield!
       // Fetch all schedules packages or just add all listed packages
@@ -262,7 +247,7 @@ export default function DashboardScreen() {
                   {isLocked ? 'SHIELD ON' : 'SHIELD OFF'}
                 </Text>
                 <Text style={styles.dialDetail}>
-                  {isLocked ? (isTimerExpired ? 'HUSTLE COMPLETE' : `${blockedCount} APPS BLOCKED`) : 'READY FOR SHIELD'}
+                  {isLocked ? `${blockedCount} APPS BLOCKED` : 'READY FOR SHIELD'}
                 </Text>
               </View>
             </View>
@@ -291,17 +276,10 @@ export default function DashboardScreen() {
             onPress={toggleShield}
           >
             {isLocked ? (
-              isTimerExpired ? (
-                <>
-                  <Square color="#FFFFFF" size={20} fill="#FFFFFF" />
-                  <Text style={styles.actionButtonText}>DISABLE SHIELD</Text>
-                </>
-              ) : (
-                <>
-                  <Square color="#FFFFFF" size={20} fill="#FFFFFF" />
-                  <Text style={styles.actionButtonText}>NEGOTIATE DISABLE</Text>
-                </>
-              )
+              <>
+                <Square color="#FFFFFF" size={20} fill="#FFFFFF" />
+                <Text style={styles.actionButtonText}>NEGOTIATE DISABLE</Text>
+              </>
             ) : (
               <>
                 <Play color="#FFFFFF" size={20} fill="#FFFFFF" />
