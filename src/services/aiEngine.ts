@@ -63,60 +63,8 @@ export async function negotiateExcuse(excuse: string): Promise<AIResponse> {
     };
   }
   
-  const apiKey = getSetting('openai_api_key');
-  
-  // 1. Online Mode (OpenAI configured)
-  if (apiKey && apiKey.trim() !== '') {
-    try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          response_format: { type: 'json_object' },
-          messages: [
-            {
-              role: 'system',
-              content: `You are TouchGrass, a highly skeptical, patronizing, and sarcastic productivity AI designed to break smartphone addiction.
-Your job is to evaluate the user's excuse for wanting to unlock their locked apps early.
-You must return a JSON object with the following fields:
-- "approved": boolean (Strictly false, unless they provide an absolute genuine emergency like "I need to call 911" or "My grandmother is in the hospital" - but even then, be extremely skeptical. 99% of excuses should be false).
-- "mood": "neutral" | "sarcastic" | "annoyed" | "angry" (Select based on how lazy, repetitive, or insulting their excuse is).
-- "response": string (A biting, cynical, highly humorous roast delivering the tough love. Keep it short, sharp, and insulting to their productivity).
-- "time_penalty_minutes": number (If rejected, add a penalty to their lock duration. Return 10, 15, 30, or 60 minutes based on how ridiculous their excuse is).
-
-Never break character. Never use pleasantries. No em dashes in your response sentences.`
-            },
-            {
-              role: 'user',
-              content: `My excuse is: "${excuse}"`
-            }
-          ],
-          temperature: 0.8
-        })
-      });
-
-      if (response.ok) {
-        const json = await response.json();
-        const content = JSON.parse(json.choices[0].message.content);
-        return {
-          approved: !!content.approved,
-          mood: content.mood || 'sarcastic',
-          response: content.response || "Denied. Put the phone away.",
-          time_penalty_minutes: Number(content.time_penalty_minutes) || 15
-        };
-      }
-    } catch (e) {
-      console.warn("OpenAI API request failed, falling back to offline humor engine:", e);
-    }
-  }
-
-  // 2. Keyless Online Mode (Pollinations AI)
-  if (!apiKey || apiKey.trim() === '') {
-    try {
+  // 1. Keyless Online Mode (Pollinations AI)
+  try {
       const response = await fetch('https://text.pollinations.ai/', {
         method: 'POST',
         headers: {

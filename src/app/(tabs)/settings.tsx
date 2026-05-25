@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, Switch, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Settings, ShieldAlert, Key, Trash2, Award, HeartCrack } from 'lucide-react-native';
+import { Settings, ShieldAlert, Trash2, Award, HeartCrack } from 'lucide-react-native';
 import * as DB from '../../db/database';
 import * as TouchGrass from 'touch-grass';
 
 export default function SettingsScreen() {
-  const [apiKey, setApiKey] = useState('');
   const [difficulty, setDifficulty] = useState('medium');
   
   // Native Permissions States
@@ -19,9 +18,7 @@ export default function SettingsScreen() {
   }, []);
 
   const loadSettings = () => {
-    const key = DB.getSetting('openai_api_key') || '';
     const diff = DB.getSetting('difficulty') || 'medium';
-    setApiKey(key);
     setDifficulty(diff);
   };
 
@@ -38,11 +35,6 @@ export default function SettingsScreen() {
       setAccessibilityEnabled(true);
       setOverlayGranted(true);
     }
-  };
-
-  const saveApiKey = () => {
-    DB.setSetting('openai_api_key', apiKey.trim());
-    Alert.alert("API KEY SAVED", "TouchGrass will now use your OpenAI API key for custom dynamic roasts!");
   };
 
   const handleAccessibilityClick = () => {
@@ -138,29 +130,6 @@ export default function SettingsScreen() {
           
           <TouchableOpacity onPress={checkPermissions} style={styles.diagnosticsBtn}>
             <Text style={styles.diagnosticsBtnText}>RE-RUN PRIVILEGE DIAGNOSTICS</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* AI API Configuration */}
-        <Text style={styles.sectionTitle}>AI HUSTLE CORE CONFIG</Text>
-        <View style={styles.card}>
-          <View style={styles.apiHeaderRow}>
-            <Key color="#FFFFFF" size={16} />
-            <Text style={styles.apiTitle}>OpenAI API Secret Key</Text>
-          </View>
-          <Text style={styles.apiDesc}>
-            Enter an OpenAI API Key to enable fully dynamic GPT roasts. If left blank, TouchGrass will run on its custom local roast-template engine.
-          </Text>
-          <TextInput
-            style={styles.apiInput}
-            secureTextEntry
-            value={apiKey}
-            onChangeText={setApiKey}
-            placeholder="sk-or-your-custom-openai-key"
-            placeholderTextColor="#444444"
-          />
-          <TouchableOpacity onPress={saveApiKey} style={styles.saveBtn}>
-            <Text style={styles.saveBtnText}>COMMIT API KEY</Text>
           </TouchableOpacity>
         </View>
 
@@ -300,48 +269,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1,
   },
-  apiHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  apiTitle: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 15,
-    marginLeft: 8,
-  },
-  apiDesc: {
-    color: '#777777',
-    fontSize: 11,
-    lineHeight: 16,
-    marginBottom: 14,
-  },
-  apiInput: {
-    backgroundColor: '#0A0A0A',
-    borderWidth: 1,
-    borderColor: '#1E1E1E',
-    borderRadius: 6,
-    color: '#FFFFFF',
-    paddingHorizontal: 12,
-    height: 44,
-    fontSize: 13,
-    marginBottom: 14,
-    fontFamily: 'System',
-  },
-  saveBtn: {
-    backgroundColor: '#34C759',
-    height: 42,
-    borderRadius: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  saveBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 13,
-    letterSpacing: 1.5,
-  },
+
   maintenanceRow: {
     flexDirection: 'row',
     alignItems: 'center',
