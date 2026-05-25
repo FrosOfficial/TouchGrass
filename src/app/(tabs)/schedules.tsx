@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Clock, Plus, Trash2, ShieldAlert } from 'lucide-react-native';
+import { Clock, Plus, Trash2, ShieldAlert, ChevronUp, ChevronDown } from 'lucide-react-native';
 import * as DB from '../../db/database';
 import * as TouchGrass from 'touch-grass';
 
@@ -163,6 +163,37 @@ export default function SchedulesScreen() {
     }
   };
 
+  const adjustTime = (type: 'start' | 'end', key: 'hours' | 'minutes', delta: number) => {
+    const current = type === 'start' ? start12 : end12;
+    let val = parseInt(current[key], 10);
+    if (isNaN(val)) val = 0;
+
+    let newValStr = "";
+    if (key === 'hours') {
+      let nextVal = val + delta;
+      if (nextVal > 12) nextVal = 1;
+      if (nextVal < 1) nextVal = 12;
+      newValStr = nextVal.toString();
+    } else {
+      let nextVal = val + delta;
+      if (nextVal >= 60) nextVal = 0;
+      if (nextVal < 0) nextVal = 59;
+      newValStr = nextVal.toString().padStart(2, '0');
+    }
+
+    const next24 = compose12To24(
+      key === 'hours' ? newValStr : current.hours,
+      key === 'minutes' ? newValStr : current.minutes,
+      current.ampm as 'AM' | 'PM'
+    );
+
+    if (type === 'start') {
+      saveSettings(next24, endTime, isGlobalEnabled, null);
+    } else {
+      saveSettings(startTime, next24, isGlobalEnabled, null);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -195,25 +226,30 @@ export default function SchedulesScreen() {
             <View style={styles.timeInputCol}>
               <Text style={styles.timeLabel}>START LOCK</Text>
               <View style={styles.timePickerContainer}>
-                <TextInput
-                  style={styles.timeField}
-                  value={start12.hours}
-                  onChangeText={(text) => handleTimeChange('start', 'hours', text)}
-                  placeholder="9"
-                  placeholderTextColor="#444444"
-                  keyboardType="numeric"
-                  maxLength={2}
-                />
+                {/* Hours Spinner */}
+                <View style={styles.dialColumn}>
+                  <TouchableOpacity onPress={() => adjustTime('start', 'hours', 1)} style={styles.arrowBtn}>
+                    <ChevronUp color="#00C7FC" size={14} />
+                  </TouchableOpacity>
+                  <Text style={styles.timeDigit}>{start12.hours.padStart(2, '0')}</Text>
+                  <TouchableOpacity onPress={() => adjustTime('start', 'hours', -1)} style={styles.arrowBtn}>
+                    <ChevronDown color="#00C7FC" size={14} />
+                  </TouchableOpacity>
+                </View>
+                
                 <Text style={styles.timeColon}>:</Text>
-                <TextInput
-                  style={styles.timeField}
-                  value={start12.minutes}
-                  onChangeText={(text) => handleTimeChange('start', 'minutes', text)}
-                  placeholder="00"
-                  placeholderTextColor="#444444"
-                  keyboardType="numeric"
-                  maxLength={2}
-                />
+                
+                {/* Minutes Spinner */}
+                <View style={styles.dialColumn}>
+                  <TouchableOpacity onPress={() => adjustTime('start', 'minutes', 1)} style={styles.arrowBtn}>
+                    <ChevronUp color="#00C7FC" size={14} />
+                  </TouchableOpacity>
+                  <Text style={styles.timeDigit}>{start12.minutes}</Text>
+                  <TouchableOpacity onPress={() => adjustTime('start', 'minutes', -1)} style={styles.arrowBtn}>
+                    <ChevronDown color="#00C7FC" size={14} />
+                  </TouchableOpacity>
+                </View>
+
                 <TouchableOpacity 
                   style={styles.ampmButton}
                   onPress={() => handleTimeChange('start', 'ampm', start12.ampm === 'AM' ? 'PM' : 'AM')}
@@ -230,25 +266,30 @@ export default function SchedulesScreen() {
             <View style={styles.timeInputCol}>
               <Text style={styles.timeLabel}>RELEASE LOCK</Text>
               <View style={styles.timePickerContainer}>
-                <TextInput
-                  style={styles.timeField}
-                  value={end12.hours}
-                  onChangeText={(text) => handleTimeChange('end', 'hours', text)}
-                  placeholder="5"
-                  placeholderTextColor="#444444"
-                  keyboardType="numeric"
-                  maxLength={2}
-                />
+                {/* Hours Spinner */}
+                <View style={styles.dialColumn}>
+                  <TouchableOpacity onPress={() => adjustTime('end', 'hours', 1)} style={styles.arrowBtn}>
+                    <ChevronUp color="#00C7FC" size={14} />
+                  </TouchableOpacity>
+                  <Text style={styles.timeDigit}>{end12.hours.padStart(2, '0')}</Text>
+                  <TouchableOpacity onPress={() => adjustTime('end', 'hours', -1)} style={styles.arrowBtn}>
+                    <ChevronDown color="#00C7FC" size={14} />
+                  </TouchableOpacity>
+                </View>
+                
                 <Text style={styles.timeColon}>:</Text>
-                <TextInput
-                  style={styles.timeField}
-                  value={end12.minutes}
-                  onChangeText={(text) => handleTimeChange('end', 'minutes', text)}
-                  placeholder="00"
-                  placeholderTextColor="#444444"
-                  keyboardType="numeric"
-                  maxLength={2}
-                />
+                
+                {/* Minutes Spinner */}
+                <View style={styles.dialColumn}>
+                  <TouchableOpacity onPress={() => adjustTime('end', 'minutes', 1)} style={styles.arrowBtn}>
+                    <ChevronUp color="#00C7FC" size={14} />
+                  </TouchableOpacity>
+                  <Text style={styles.timeDigit}>{end12.minutes}</Text>
+                  <TouchableOpacity onPress={() => adjustTime('end', 'minutes', -1)} style={styles.arrowBtn}>
+                    <ChevronDown color="#00C7FC" size={14} />
+                  </TouchableOpacity>
+                </View>
+
                 <TouchableOpacity 
                   style={styles.ampmButton}
                   onPress={() => handleTimeChange('end', 'ampm', end12.ampm === 'AM' ? 'PM' : 'AM')}
@@ -258,7 +299,7 @@ export default function SchedulesScreen() {
               </View>
             </View>
           </View>
-          <Text style={styles.timeTip}>Set hours (1-12), minutes (00-59), and toggle AM/PM.</Text>
+          <Text style={styles.timeTip}>Tap arrows to adjust hours & minutes. Toggle AM/PM.</Text>
         </View>
 
         {/* Preset Header */}
@@ -413,23 +454,32 @@ const styles = StyleSheet.create({
     borderColor: '#222222',
     borderRadius: 6,
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    height: 46,
+    paddingVertical: 2,
+    height: 64,
   },
-  timeField: {
+  dialColumn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timeDigit: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '900',
     textAlign: 'center',
-    width: 28,
+    width: 24,
     fontFamily: 'System',
-    padding: 0,
+    lineHeight: 18,
+  },
+  arrowBtn: {
+    paddingVertical: 1,
+    paddingHorizontal: 4,
   },
   timeColon: {
     color: '#555555',
     fontSize: 16,
     fontWeight: '900',
     marginHorizontal: 2,
+    alignSelf: 'center',
   },
   ampmButton: {
     backgroundColor: '#222222',
