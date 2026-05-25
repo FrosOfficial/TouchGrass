@@ -30,6 +30,13 @@ export function openOverlaySettings(): void {
   TouchGrassModule.openOverlaySettings();
 }
 
+export function isAutoTimeEnabled(): boolean {
+  if (TouchGrassModule && typeof TouchGrassModule.isAutoTimeEnabled === 'function') {
+    return TouchGrassModule.isAutoTimeEnabled();
+  }
+  return true;
+}
+
 export function updateLockState(isLocked: boolean, lockUntilMs: number, blockedPackages: string): void {
   TouchGrassModule.updateLockState(isLocked, lockUntilMs, blockedPackages);
 }

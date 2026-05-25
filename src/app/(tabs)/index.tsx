@@ -67,10 +67,11 @@ export default function DashboardScreen() {
       // 3. Load latest AI message
       const history = DB.getChatHistory();
       const aiMessages = history.filter(m => m.role === 'ai');
+      let aiRoast = "";
       if (aiMessages.length > 0) {
-        setLatestRoast(aiMessages[aiMessages.length - 1].message);
+        aiRoast = aiMessages[aiMessages.length - 1].message;
       } else {
-        setLatestRoast("Oh look, you haven't locked your phone yet. Ready to fail your productivity goals today?");
+        aiRoast = "Oh look, you haven't locked your phone yet. Ready to fail your productivity goals today?";
       }
 
       // 4. Synchronize database schedules to native SharedPreferences and get current state
@@ -103,7 +104,15 @@ export default function DashboardScreen() {
           isGlobalLocked = isCurrentTimeInWindowJS(start, end);
         }
 
-        const isShieldActive = targetLocked || isGlobalLocked;
+        // Clock tampering bypass protection in UI
+        const autoTimeEnabled = TouchGrass.isAutoTimeEnabled();
+        if (!autoTimeEnabled && (state.isLocked || globalEnabled)) {
+          aiRoast = "DETECTED CLOCK TAMPERING! Nice try, changing the system time won't save you. Put the phone down.";
+          setAiMood('angry');
+        }
+        setLatestRoast(aiRoast);
+
+        const isShieldActive = targetLocked || isGlobalLocked || (!autoTimeEnabled && (state.isLocked || globalEnabled));
         setIsLocked(isShieldActive);
         setLockUntil(targetLocked ? targetUntil : 0);
         

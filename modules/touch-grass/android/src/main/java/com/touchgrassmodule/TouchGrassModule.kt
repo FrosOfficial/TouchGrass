@@ -62,6 +62,24 @@ class TouchGrassModule : Module() {
       Settings.canDrawOverlays(context)
     }
 
+    Function("isAutoTimeEnabled") {
+      try {
+        val autoTime = Settings.Global.getInt(
+          context.contentResolver,
+          Settings.Global.AUTO_TIME,
+          1
+        )
+        val autoTimeZone = Settings.Global.getInt(
+          context.contentResolver,
+          Settings.Global.AUTO_TIME_ZONE,
+          1
+        )
+        autoTime == 1 && autoTimeZone == 1
+      } catch (e: Exception) {
+        true
+      }
+    }
+
     Function("openOverlaySettings") {
       val intent = Intent(
         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,

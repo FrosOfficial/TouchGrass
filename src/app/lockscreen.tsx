@@ -38,19 +38,25 @@ function isCurrentLockActive(): boolean {
     const now = Date.now();
     
     // Check manual lock
-    if (state.isLocked && state.lockUntil > now) {
-      return true;
-    }
+    let active = state.isLocked && state.lockUntil > now;
     
     // Check global lock
     const globalEnabled = DB.getSetting('global_lock_enabled') === 'true';
-    if (globalEnabled) {
+    if (!active && globalEnabled) {
       const start = DB.getSetting('global_lock_start') || '09:00';
       const end = DB.getSetting('global_lock_end') || '17:00';
       if (isCurrentTimeInWindowJS(start, end)) {
-        return true;
+        active = true;
       }
     }
+
+    // Bypass protection: if auto-time is disabled while locks are configured, force it active
+    const autoTimeEnabled = TouchGrass.isAutoTimeEnabled();
+    if (!autoTimeEnabled && (state.isLocked || globalEnabled)) {
+      active = true;
+    }
+
+    return active;
   } catch (e) {
     console.error(e);
   }

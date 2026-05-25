@@ -60,15 +60,23 @@ class TouchGrassAccessibilityService : AccessibilityService() {
         // Check if manual lock is active
         var activeLock = isLocked && (lockUntil > currentTime)
 
-        // If not active, check if global lockdown window is active
-        if (!activeLock) {
-            val globalEnabled = prefs.getBoolean("global_lock_enabled", false)
-            if (globalEnabled) {
-                val startStr = prefs.getString("global_lock_start", "") ?: ""
-                val endStr = prefs.getString("global_lock_end", "") ?: ""
-                if (startStr.isNotEmpty() && endStr.isNotEmpty()) {
-                    if (isCurrentTimeInWindow(startStr, endStr)) {
-                        activeLock = true
+        val globalEnabled = prefs.getBoolean("global_lock_enabled", false)
+
+        // Date and time bypass protection
+        val autoTimeEnabled = isAutoTimeEnabled(this)
+        if (!autoTimeEnabled && (isLocked || globalEnabled)) {
+            // Force lock because they tampered with the system clock!
+            activeLock = true
+        } else {
+            // If not active, check if global lockdown window is active
+            if (!activeLock) {
+                if (globalEnabled) {
+                    val startStr = prefs.getString("global_lock_start", "") ?: ""
+                    val endStr = prefs.getString("global_lock_end", "") ?: ""
+                    if (startStr.isNotEmpty() && endStr.isNotEmpty()) {
+                        if (isCurrentTimeInWindow(startStr, endStr)) {
+                            activeLock = true
+                        }
                     }
                 }
             }
@@ -124,6 +132,24 @@ class TouchGrassAccessibilityService : AccessibilityService() {
             }
         } catch (e: Exception) {
             return false
+        }
+    }
+
+    private fun isAutoTimeEnabled(context: Context): Boolean {
+        return try {
+            val autoTime = android.provider.Settings.Global.getInt(
+                context.contentResolver,
+                android.provider.Settings.Global.AUTO_TIME,
+                1
+            )
+            val autoTimeZone = android.provider.Settings.Global.getInt(
+                context.contentResolver,
+                android.provider.Settings.Global.AUTO_TIME_ZONE,
+                1
+            )
+            autoTime == 1 && autoTimeZone == 1
+        } catch (e: Exception) {
+            true
         }
     }
 
