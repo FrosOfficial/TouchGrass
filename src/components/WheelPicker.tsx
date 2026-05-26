@@ -2,12 +2,11 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  FlatList,
   StyleSheet,
-  TouchableOpacity,
-  ViewStyle,
+  ScrollView,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  ViewStyle,
 } from 'react-native';
 
 interface WheelPickerProps {
@@ -34,31 +33,24 @@ export default function WheelPicker({
   style,
   width = 60,
 }: WheelPickerProps) {
-  const listRef = useRef<FlatList>(null);
+  const scrollRef = useRef<ScrollView>(null);
   const containerHeight = itemHeight * visibleItems;
   const padCount = Math.floor(visibleItems / 2);
-
-  // Pad top/bottom with empty strings so the first/last items can be centered
-  const paddedItems = [
-    ...Array(padCount).fill(''),
-    ...items,
-    ...Array(padCount).fill(''),
-  ];
 
   const selectedIndex = items.indexOf(selectedValue);
 
   // Scroll to selected item on mount and when selectedValue changes externally
   useEffect(() => {
     const idx = items.indexOf(selectedValue);
-    if (idx !== -1 && listRef.current) {
+    if (idx !== -1 && scrollRef.current) {
       setTimeout(() => {
-        listRef.current?.scrollToOffset({
-          offset: idx * itemHeight,
+        scrollRef.current?.scrollTo({
+          y: idx * itemHeight,
           animated: false,
         });
       }, 50);
     }
-  }, [selectedValue]);
+  }, [selectedValue, itemHeight]);
 
   const handleScrollEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -71,58 +63,6 @@ export default function WheelPicker({
     },
     [items, itemHeight, selectedValue, onChange]
   );
-
-  const renderItem = ({ item, index }: { item: string; index: number }) => {
-    const realIndex = index - padCount;
-    const isSelected = realIndex === selectedIndex;
-    const distance = Math.abs(realIndex - selectedIndex);
-
-    // Calculate opacity and scale based on distance from center
-    let opacity = 1;
-    let scale = 1;
-    let color = '#FFFFFF';
-    if (distance === 0) {
-      opacity = 1;
-      scale = 1.05;
-      color = accentColor;
-    } else if (distance === 1) {
-      opacity = 0.55;
-      scale = 0.92;
-      color = '#AAAAAA';
-    } else {
-      opacity = 0.2;
-      scale = 0.82;
-      color = '#666666';
-    }
-
-    if (item === '') {
-      return <View style={{ height: itemHeight, width }} />;
-    }
-
-    return (
-      <View
-        style={[
-          styles.item,
-          { height: itemHeight, width },
-        ]}
-      >
-        <Text
-          style={[
-            styles.itemText,
-            {
-              opacity,
-              transform: [{ scale }],
-              color,
-              fontWeight: isSelected ? '900' : '700',
-              fontSize: isSelected ? 22 : 18,
-            },
-          ]}
-        >
-          {item}
-        </Text>
-      </View>
-    );
-  };
 
   return (
     <View style={[styles.container, { height: containerHeight, width }, style]}>
@@ -139,25 +79,61 @@ export default function WheelPicker({
         ]}
       />
 
-      <FlatList
-        ref={listRef}
-        data={paddedItems}
-        keyExtractor={(_, i) => i.toString()}
-        renderItem={renderItem}
+      <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         snapToInterval={itemHeight}
         decelerationRate="fast"
         onMomentumScrollEnd={handleScrollEnd}
         onScrollEndDrag={handleScrollEnd}
-        getItemLayout={(_, index) => ({
-          length: itemHeight,
-          offset: itemHeight * index,
-          index,
-        })}
-        contentContainerStyle={{ paddingVertical: 0 }}
         scrollEventThrottle={16}
         bounces={false}
-      />
+        nestedScrollEnabled={true}
+        contentContainerStyle={{ paddingVertical: itemHeight * padCount }}
+      >
+        {items.map((item, index) => {
+          const distance = Math.abs(index - selectedIndex);
+          let opacity = 1;
+          let scale = 1;
+          let color = '#FFFFFF';
+
+          if (distance === 0) {
+            opacity = 1;
+            scale = 1.05;
+            color = accentColor;
+          } else if (distance === 1) {
+            opacity = 0.55;
+            scale = 0.92;
+            color = '#AAAAAA';
+          } else {
+            opacity = 0.2;
+            scale = 0.82;
+            color = '#666666';
+          }
+
+          return (
+            <View
+              key={index}
+              style={[styles.item, { height: itemHeight, width }]}
+            >
+              <Text
+                style={[
+                  styles.itemText,
+                  {
+                    opacity,
+                    transform: [{ scale }],
+                    color,
+                    fontWeight: distance === 0 ? '900' : '700',
+                    fontSize: distance === 0 ? 22 : 18,
+                  },
+                ]}
+              >
+                {item}
+              </Text>
+            </View>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
@@ -174,7 +150,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderBottomWidth: 1,
     zIndex: 1,
-    pointerEvents: 'none',
   },
   item: {
     justifyContent: 'center',
