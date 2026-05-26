@@ -390,39 +390,44 @@ export default function DashboardScreen() {
           {/* Lock Shield Dial with Animated transitions */}
           <View style={styles.dialContainer}>
             <Animated.View
-              style={[
-                styles.outerDial,
-                {
-                  borderColor: dialBorderColor,
-                  transform: [{ scale: shieldScaleAnim }],
-                },
-              ]}
+              style={{
+                transform: [{ scale: shieldScaleAnim }],
+              }}
             >
-              <View style={styles.innerDial}>
-                {/* Cross-fading shield icons */}
-                <View style={styles.iconStack}>
-                  <Animated.View style={[styles.iconAbsolute, { opacity: lockedShieldOpacity }]}>
-                    <ShieldAlert color="#FF3B30" size={64} />
-                  </Animated.View>
-                  <Animated.View style={[styles.iconAbsolute, { opacity: unlockedShieldOpacity }]}>
-                    <Shield color="#00C7FC" size={64} />
-                  </Animated.View>
-                </View>
+              <Animated.View
+                style={[
+                  styles.outerDial,
+                  {
+                    borderColor: dialBorderColor,
+                  },
+                ]}
+              >
+                <View style={styles.innerDial}>
+                  {/* Cross-fading shield icons */}
+                  <View style={styles.iconStack}>
+                    <Animated.View style={[styles.iconAbsolute, { opacity: lockedShieldOpacity }]}>
+                      <ShieldAlert color="#FF3B30" size={64} />
+                    </Animated.View>
+                    <Animated.View style={[styles.iconAbsolute, { opacity: unlockedShieldOpacity }]}>
+                      <Shield color="#00C7FC" size={64} />
+                    </Animated.View>
+                  </View>
 
-                <Animated.Text style={[styles.dialStatus, { color: dialStatusColor }]}>
-                  {isLocked ? 'SHIELD ON' : 'SHIELD OFF'}
-                </Animated.Text>
+                  <Animated.Text style={[styles.dialStatus, { color: dialStatusColor }]}>
+                    {isLocked ? 'SHIELD ON' : 'SHIELD OFF'}
+                  </Animated.Text>
 
-                <Text style={styles.dialDetail}>
-                  {isLocked ? `${blockedCount} APPS BLOCKED` : 'READY FOR SHIELD'}
-                </Text>
-
-                {lockUntil > Date.now() && (
-                  <Text style={[styles.dialCountdown, { color: '#FF3B30' }]}>
-                    {getRemainingTimeStr()}
+                  <Text style={styles.dialDetail}>
+                    {isLocked ? `${blockedCount} APPS BLOCKED` : 'READY FOR SHIELD'}
                   </Text>
-                )}
-              </View>
+
+                  {lockUntil > Date.now() && (
+                    <Text style={[styles.dialCountdown, { color: '#FF3B30' }]}>
+                      {getRemainingTimeStr()}
+                    </Text>
+                  )}
+                </View>
+              </Animated.View>
             </Animated.View>
           </View>
 
