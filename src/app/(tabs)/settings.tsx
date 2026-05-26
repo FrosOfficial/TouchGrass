@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, Switch, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Settings, ShieldAlert, Trash2, Award, HeartCrack } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { Settings, Trash2, Award, HeartCrack } from 'lucide-react-native';
 import * as DB from '../../db/database';
 import * as TouchGrass from 'touch-grass';
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const [difficulty, setDifficulty] = useState('medium');
   
   // Native Permissions States
@@ -90,46 +92,75 @@ export default function SettingsScreen() {
           <Settings color="#34C759" size={24} />
         </View>
 
-        {/* Permissions Section */}
-        <Text style={styles.sectionTitle}>SYSTEM LEVEL PRIVILEGES</Text>
-        
+        {/* System Setup Checklist */}
+        <Text style={styles.sectionTitle}>SYSTEM SETUP</Text>
         <View style={styles.card}>
-          <View style={styles.permissionItem}>
-            <View style={styles.permissionInfo}>
-              <Text style={styles.permissionName}>1. Accessibility Shield</Text>
-              <Text style={styles.permissionDesc}>Required to detect foreground apps instantly without battery drain.</Text>
+          <Text style={styles.setupCardDesc}>
+            TouchGrass needs these two permissions to work. Both must be active for the shield to function.
+          </Text>
+
+          {/* Accessibility row */}
+          <View style={styles.checklistRow}>
+            <View style={[
+              styles.checklistIconBox,
+              { backgroundColor: accessibilityEnabled ? '#1E3E28' : '#3D1D1D', borderColor: accessibilityEnabled ? '#34C759' : '#FF3B30' }
+            ]}>
+              {accessibilityEnabled
+                ? <Award color="#34C759" size={18} />
+                : <HeartCrack color="#FF3B30" size={18} />}
             </View>
-            <TouchableOpacity 
-              style={[
-                styles.permissionStatusBtn, 
-                accessibilityEnabled ? styles.statusBtnEnabled : styles.statusBtnDisabled
-              ]}
-              onPress={handleAccessibilityClick}
+            <View style={styles.checklistInfo}>
+              <Text style={styles.checklistName}>Accessibility Shield</Text>
+              <Text style={styles.checklistDesc}>Detects foreground app for blocking</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.checklistBtn, { borderColor: accessibilityEnabled ? '#34C759' : '#FF3B30' }]}
+              onPress={accessibilityEnabled ? undefined : handleAccessibilityClick}
             >
-              <Text style={styles.statusBtnText}>{accessibilityEnabled ? 'ACTIVE' : 'GRANT'}</Text>
+              <Text style={[styles.checklistBtnText, { color: accessibilityEnabled ? '#34C759' : '#FF3B30' }]}>
+                {accessibilityEnabled ? '✓ ACTIVE' : 'GRANT'}
+              </Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.divider} />
 
-          <View style={styles.permissionItem}>
-            <View style={styles.permissionInfo}>
-              <Text style={styles.permissionName}>2. Overlay Shield Window</Text>
-              <Text style={styles.permissionDesc}>Required to draw the full screen roast negotiation overlay immediately.</Text>
+          {/* Overlay row */}
+          <View style={styles.checklistRow}>
+            <View style={[
+              styles.checklistIconBox,
+              { backgroundColor: overlayGranted ? '#1E3E28' : '#3D1D1D', borderColor: overlayGranted ? '#34C759' : '#FF3B30' }
+            ]}>
+              {overlayGranted
+                ? <Award color="#34C759" size={18} />
+                : <HeartCrack color="#FF3B30" size={18} />}
             </View>
-            <TouchableOpacity 
-              style={[
-                styles.permissionStatusBtn, 
-                overlayGranted ? styles.statusBtnEnabled : styles.statusBtnDisabled
-              ]}
-              onPress={handleOverlayClick}
+            <View style={styles.checklistInfo}>
+              <Text style={styles.checklistName}>Overlay Window</Text>
+              <Text style={styles.checklistDesc}>Draws lockscreen over blocked apps</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.checklistBtn, { borderColor: overlayGranted ? '#34C759' : '#FF3B30' }]}
+              onPress={overlayGranted ? undefined : handleOverlayClick}
             >
-              <Text style={styles.statusBtnText}>{overlayGranted ? 'ACTIVE' : 'GRANT'}</Text>
+              <Text style={[styles.checklistBtnText, { color: overlayGranted ? '#34C759' : '#FF3B30' }]}>
+                {overlayGranted ? '✓ ACTIVE' : 'GRANT'}
+              </Text>
             </TouchableOpacity>
           </View>
-          
+
           <TouchableOpacity onPress={checkPermissions} style={styles.diagnosticsBtn}>
-            <Text style={styles.diagnosticsBtnText}>RE-RUN PRIVILEGE DIAGNOSTICS</Text>
+            <Text style={styles.diagnosticsBtnText}>↺ REFRESH STATUS</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              DB.setSetting('onboarding_complete', 'false');
+              router.replace('/onboarding' as any);
+            }}
+            style={styles.wizardBtn}
+          >
+            <Text style={styles.wizardBtnText}>RE-LAUNCH SETUP WIZARD</Text>
           </TouchableOpacity>
         </View>
 
@@ -157,6 +188,7 @@ export default function SettingsScreen() {
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
@@ -204,48 +236,51 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 20,
   },
-  permissionItem: {
+  setupCardDesc: {
+    color: '#888888',
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  checklistRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
+    marginVertical: 6,
   },
-  permissionInfo: {
+  checklistIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  checklistInfo: {
     flex: 1,
     marginRight: 10,
   },
-  permissionName: {
+  checklistName: {
     color: '#FFFFFF',
     fontWeight: '900',
-    fontSize: 14,
+    fontSize: 13,
   },
-  permissionDesc: {
+  checklistDesc: {
     color: '#777777',
     fontSize: 11,
-    lineHeight: 16,
-    marginTop: 3,
+    marginTop: 2,
   },
-  permissionStatusBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 4,
-    minWidth: 70,
+  checklistBtn: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    minWidth: 68,
     alignItems: 'center',
   },
-  statusBtnEnabled: {
-    backgroundColor: '#1E3E28',
-    borderWidth: 1,
-    borderColor: '#34C759',
-  },
-  statusBtnDisabled: {
-    backgroundColor: '#3D1D1D',
-    borderWidth: 1,
-    borderColor: '#FF3B30',
-  },
-  statusBtnText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
+  checklistBtnText: {
     fontSize: 10,
+    fontWeight: '900',
     letterSpacing: 0.5,
   },
   divider: {
@@ -265,6 +300,22 @@ const styles = StyleSheet.create({
   },
   diagnosticsBtnText: {
     color: '#CCCCCC',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  wizardBtn: {
+    backgroundColor: '#0D1F2A',
+    borderWidth: 1,
+    borderColor: '#00C7FC44',
+    height: 40,
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  wizardBtnText: {
+    color: '#00C7FC',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,

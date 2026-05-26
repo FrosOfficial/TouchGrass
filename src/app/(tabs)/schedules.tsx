@@ -1,22 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Clock, Plus, Trash2, ShieldAlert, ChevronUp, ChevronDown } from 'lucide-react-native';
+import { Clock, ShieldAlert } from 'lucide-react-native';
 import * as DB from '../../db/database';
 import * as TouchGrass from 'touch-grass';
+import WheelPicker from '../../components/WheelPicker';
+
+// Build hour/minute lists
+const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString());
+const MINUTES = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
+const AMPMS = ['AM', 'PM'];
 
 function parse24To12(time24: string) {
-  const [hStr, mStr] = (time24 || "09:00").split(':');
+  const [hStr, mStr] = (time24 || '09:00').split(':');
   let h = parseInt(hStr, 10);
   if (isNaN(h)) h = 9;
-  const m = mStr || "00";
+  const m = mStr || '00';
   const ampm = h >= 12 ? 'PM' : 'AM';
   h = h % 12;
   if (h === 0) h = 12;
   return {
     hours: h.toString(),
-    minutes: m,
-    ampm
+    minutes: m.padStart(2, '0'),
+    ampm,
   };
 }
 
@@ -48,7 +54,6 @@ export default function SchedulesScreen() {
     const end = DB.getSetting('global_lock_end') || '17:00';
     const enabled = DB.getSetting('global_lock_enabled') === 'true';
     const preset = DB.getSetting('global_lock_preset') || null;
-
     setStartTime(start);
     setEndTime(end);
     setIsGlobalEnabled(enabled);
@@ -56,41 +61,25 @@ export default function SchedulesScreen() {
   };
 
   const saveSettings = (start: string, end: string, enabled: boolean, preset: string | null) => {
-    // Basic format validation hh:mm
-    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    if (!timeRegex.test(start) || !timeRegex.test(end)) {
-      Alert.alert("Invalid Format", "Please use 24-hour format HH:MM (e.g. 09:30)");
-      return;
-    }
-
     DB.setSetting('global_lock_start', start);
     DB.setSetting('global_lock_end', end);
     DB.setSetting('global_lock_enabled', enabled ? 'true' : 'false');
-    if (preset) {
-      DB.setSetting('global_lock_preset', preset);
-    } else {
-      DB.setSetting('global_lock_preset', '');
-    }
+    DB.setSetting('global_lock_preset', preset ?? '');
 
     setStartTime(start);
     setEndTime(end);
     setIsGlobalEnabled(enabled);
     setActivePreset(preset);
 
-    // Sync to background service if enabled!
     if (Platform.OS === 'android') {
       try {
         const schedules = DB.getSchedules();
         const activePackages = schedules.filter(s => s.is_enabled).map(s => s.app_package).join(',');
-        
-        // Sync global settings
         TouchGrass.updateGlobalLockSettings(enabled, start, end);
-        
-        // Sync active packages and preserve the manual lock state
         const activeState = TouchGrass.getLockState();
         TouchGrass.updateLockState(activeState.isLocked, activeState.lockUntil, activePackages);
       } catch (e) {
-        console.error("Failed to sync global lock settings natively:", e);
+        console.error('Failed to sync global lock settings natively:', e);
       }
     }
   };
@@ -100,45 +89,17 @@ export default function SchedulesScreen() {
   };
 
   const toggleGlobalLock = () => {
-    const nextEnabled = !isGlobalEnabled;
-    saveSettings(startTime, endTime, nextEnabled, activePreset);
+    saveSettings(startTime, endTime, !isGlobalEnabled, activePreset);
   };
 
+  // Derived wheel values
   const start12 = parse24To12(startTime);
   const end12 = parse24To12(endTime);
 
-  const handleTimeChange = (type: 'start' | 'end', key: 'hours' | 'minutes' | 'ampm', val: string) => {
+  const handleWheelChange = (type: 'start' | 'end', key: 'hours' | 'minutes' | 'ampm', val: string) => {
     const current = type === 'start' ? start12 : end12;
-    const newComponents = { ...current, [key]: val };
-    
-    // Auto-clamp and format hours
-    let cleanHours = newComponents.hours;
-    if (key === 'hours') {
-      const hInt = parseInt(val, 10);
-      if (!isNaN(hInt)) {
-        if (hInt < 1) cleanHours = "1";
-        else if (hInt > 12) cleanHours = "12";
-        else cleanHours = hInt.toString();
-      } else {
-        cleanHours = "";
-      }
-    }
-    
-    // Auto-clamp and format minutes
-    let cleanMinutes = newComponents.minutes;
-    if (key === 'minutes') {
-      const mInt = parseInt(val, 10);
-      if (!isNaN(mInt)) {
-        if (mInt < 0) cleanMinutes = "00";
-        else if (mInt > 59) cleanMinutes = "59";
-        else cleanMinutes = val;
-      } else {
-        cleanMinutes = "";
-      }
-    }
-
-    const next24 = compose12To24(cleanHours || "12", cleanMinutes || "00", newComponents.ampm as 'AM' | 'PM');
-    
+    const next = { ...current, [key]: val };
+    const next24 = compose12To24(next.hours, next.minutes, next.ampm as 'AM' | 'PM');
     if (type === 'start') {
       saveSettings(next24, endTime, isGlobalEnabled, null);
     } else {
@@ -146,35 +107,41 @@ export default function SchedulesScreen() {
     }
   };
 
-  const adjustTime = (type: 'start' | 'end', key: 'hours' | 'minutes', delta: number) => {
-    const current = type === 'start' ? start12 : end12;
-    let val = parseInt(current[key], 10);
-    if (isNaN(val)) val = 0;
-
-    let newValStr = "";
-    if (key === 'hours') {
-      let nextVal = val + delta;
-      if (nextVal > 12) nextVal = 1;
-      if (nextVal < 1) nextVal = 12;
-      newValStr = nextVal.toString();
-    } else {
-      let nextVal = val + delta;
-      if (nextVal >= 60) nextVal = 0;
-      if (nextVal < 0) nextVal = 59;
-      newValStr = nextVal.toString().padStart(2, '0');
-    }
-
-    const next24 = compose12To24(
-      key === 'hours' ? newValStr : current.hours,
-      key === 'minutes' ? newValStr : current.minutes,
-      current.ampm as 'AM' | 'PM'
+  const renderTimePicker = (type: 'start' | 'end') => {
+    const t12 = type === 'start' ? start12 : end12;
+    return (
+      <View style={styles.wheelPickerContainer}>
+        <WheelPicker
+          items={HOURS}
+          selectedValue={t12.hours}
+          onChange={val => handleWheelChange(type, 'hours', val)}
+          itemHeight={44}
+          visibleItems={5}
+          accentColor="#00C7FC"
+          width={52}
+        />
+        <Text style={styles.wheelColon}>:</Text>
+        <WheelPicker
+          items={MINUTES}
+          selectedValue={t12.minutes}
+          onChange={val => handleWheelChange(type, 'minutes', val)}
+          itemHeight={44}
+          visibleItems={5}
+          accentColor="#00C7FC"
+          width={52}
+        />
+        <WheelPicker
+          items={AMPMS}
+          selectedValue={t12.ampm}
+          onChange={val => handleWheelChange(type, 'ampm', val)}
+          itemHeight={44}
+          visibleItems={5}
+          accentColor="#FF9500"
+          width={48}
+          style={{ marginLeft: 8 }}
+        />
+      </View>
     );
-
-    if (type === 'start') {
-      saveSettings(next24, endTime, isGlobalEnabled, null);
-    } else {
-      saveSettings(startTime, next24, isGlobalEnabled, null);
-    }
   };
 
   return (
@@ -193,7 +160,7 @@ export default function SchedulesScreen() {
         <View style={[styles.card, isGlobalEnabled && styles.cardActive]}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>Global Lockdown Window</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.toggleBtn, isGlobalEnabled && styles.toggleBtnActive]}
               onPress={toggleGlobalLock}
             >
@@ -204,125 +171,71 @@ export default function SchedulesScreen() {
             When active, apps in your Shield List will automatically lock down tight between these times.
           </Text>
 
-          {/* Time Picker Inputs */}
-          <View style={styles.timeInputsRow}>
-            <View style={styles.timeInputCol}>
+          {/* Time Pickers Row */}
+          <View style={styles.timePickersRow}>
+            <View style={styles.timePickerCol}>
               <Text style={styles.timeLabel}>START LOCK</Text>
-              <View style={styles.timePickerContainer}>
-                {/* Hours Spinner */}
-                <View style={styles.dialColumn}>
-                  <TouchableOpacity onPress={() => adjustTime('start', 'hours', 1)} style={styles.arrowBtn}>
-                    <ChevronUp color="#00C7FC" size={22} />
-                  </TouchableOpacity>
-                  <Text style={styles.timeDigit}>{start12.hours.padStart(2, '0')}</Text>
-                  <TouchableOpacity onPress={() => adjustTime('start', 'hours', -1)} style={styles.arrowBtn}>
-                    <ChevronDown color="#00C7FC" size={22} />
-                  </TouchableOpacity>
-                </View>
-                
-                <Text style={styles.timeColon}>:</Text>
-                
-                {/* Minutes Spinner */}
-                <View style={styles.dialColumn}>
-                  <TouchableOpacity onPress={() => adjustTime('start', 'minutes', 1)} style={styles.arrowBtn}>
-                    <ChevronUp color="#00C7FC" size={22} />
-                  </TouchableOpacity>
-                  <Text style={styles.timeDigit}>{start12.minutes}</Text>
-                  <TouchableOpacity onPress={() => adjustTime('start', 'minutes', -1)} style={styles.arrowBtn}>
-                    <ChevronDown color="#00C7FC" size={22} />
-                  </TouchableOpacity>
-                </View>
+              {renderTimePicker('start')}
+            </View>
 
-                <TouchableOpacity 
-                  style={styles.ampmButton}
-                  onPress={() => handleTimeChange('start', 'ampm', start12.ampm === 'AM' ? 'PM' : 'AM')}
-                >
-                  <Text style={styles.ampmText}>{start12.ampm}</Text>
-                </TouchableOpacity>
-              </View>
+            <View style={styles.separatorCol}>
+              <Text style={styles.separatorText}>TO</Text>
             </View>
-            
-            <View style={styles.timeInputSeparator}>
-              <Text style={styles.separatorText}>UNTIL</Text>
-            </View>
-            
-            <View style={styles.timeInputCol}>
+
+            <View style={styles.timePickerCol}>
               <Text style={styles.timeLabel}>RELEASE LOCK</Text>
-              <View style={styles.timePickerContainer}>
-                {/* Hours Spinner */}
-                <View style={styles.dialColumn}>
-                  <TouchableOpacity onPress={() => adjustTime('end', 'hours', 1)} style={styles.arrowBtn}>
-                    <ChevronUp color="#00C7FC" size={22} />
-                  </TouchableOpacity>
-                  <Text style={styles.timeDigit}>{end12.hours.padStart(2, '0')}</Text>
-                  <TouchableOpacity onPress={() => adjustTime('end', 'hours', -1)} style={styles.arrowBtn}>
-                    <ChevronDown color="#00C7FC" size={22} />
-                  </TouchableOpacity>
-                </View>
-                
-                <Text style={styles.timeColon}>:</Text>
-                
-                {/* Minutes Spinner */}
-                <View style={styles.dialColumn}>
-                  <TouchableOpacity onPress={() => adjustTime('end', 'minutes', 1)} style={styles.arrowBtn}>
-                    <ChevronUp color="#00C7FC" size={22} />
-                  </TouchableOpacity>
-                  <Text style={styles.timeDigit}>{end12.minutes}</Text>
-                  <TouchableOpacity onPress={() => adjustTime('end', 'minutes', -1)} style={styles.arrowBtn}>
-                    <ChevronDown color="#00C7FC" size={22} />
-                  </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity 
-                  style={styles.ampmButton}
-                  onPress={() => handleTimeChange('end', 'ampm', end12.ampm === 'AM' ? 'PM' : 'AM')}
-                >
-                  <Text style={styles.ampmText}>{end12.ampm}</Text>
-                </TouchableOpacity>
-              </View>
+              {renderTimePicker('end')}
             </View>
           </View>
-          <Text style={styles.timeTip}>Tap arrows to adjust hours & minutes. Toggle AM/PM.</Text>
+
+          {/* Display selected times */}
+          <View style={styles.timeDisplayRow}>
+            <Text style={styles.timeDisplayText}>
+              {start12.hours}:{start12.minutes} {start12.ampm}
+            </Text>
+            <Text style={styles.timeDisplayArrow}>→</Text>
+            <Text style={styles.timeDisplayText}>
+              {end12.hours}:{end12.minutes} {end12.ampm}
+            </Text>
+          </View>
         </View>
 
         {/* Preset Header */}
         <Text style={styles.sectionTitle}>LOCKOUT PRESETS</Text>
 
-        {/* Presets Grid */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.presetCard, activePreset === 'hustle' && styles.presetCardActive]}
           onPress={() => applyPreset('hustle', '09:00', '17:00')}
         >
           <View style={styles.presetHeader}>
             <Text style={styles.presetName}>💼 The 9-to-5 Hustle</Text>
-            <Text style={styles.presetTime}>9:00 AM - 5:00 PM</Text>
+            <Text style={styles.presetTime}>9:00 AM – 5:00 PM</Text>
           </View>
           <Text style={styles.presetDesc}>Blocks procrastination apps completely during prime working hours.</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.presetCard, activePreset === 'morning' && styles.presetCardActive]}
           onPress={() => applyPreset('morning', '06:00', '09:00')}
         >
           <View style={styles.presetHeader}>
             <Text style={styles.presetName}>🌅 Sunrise Focus</Text>
-            <Text style={styles.presetTime}>6:00 AM - 9:00 AM</Text>
+            <Text style={styles.presetTime}>6:00 AM – 9:00 AM</Text>
           </View>
           <Text style={styles.presetDesc}>Guarantees a doomscroll-free morning so you can wake up properly.</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.presetCard, activePreset === 'sleep' && styles.presetCardActive]}
           onPress={() => applyPreset('sleep', '22:00', '06:00')}
         >
           <View style={styles.presetHeader}>
             <Text style={styles.presetName}>🌙 Sleep Shield</Text>
-            <Text style={styles.presetTime}>10:00 PM - 6:00 AM</Text>
+            <Text style={styles.presetTime}>10:00 PM – 6:00 AM</Text>
           </View>
           <Text style={styles.presetDesc}>Ensures no late-night feeds interrupt your recovery sleep cycle.</Text>
         </TouchableOpacity>
 
-        {/* Custom Info Row */}
         <View style={styles.infoBox}>
           <ShieldAlert color="#555555" size={20} />
           <Text style={styles.infoText}>
@@ -368,7 +281,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#121212',
     borderWidth: 1,
     borderColor: '#1E1E1E',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 24,
   },
@@ -406,96 +319,72 @@ const styles = StyleSheet.create({
     color: '#888888',
     fontSize: 12,
     lineHeight: 18,
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  timeInputsRow: {
+  timePickersRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#0A0A0A',
-    padding: 8,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#1E1E1E',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    marginBottom: 14,
   },
-  timeInputCol: {
+  timePickerCol: {
     flex: 1,
     alignItems: 'center',
   },
   timeLabel: {
-    color: '#888888',
-    fontSize: 10,
+    color: '#555555',
+    fontSize: 9,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
     marginBottom: 8,
   },
-  timePickerContainer: {
+  wheelPickerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#151515',
-    borderWidth: 1,
-    borderColor: '#222222',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    height: 90,
   },
-  dialColumn: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 40,
-  },
-  timeDigit: {
-    color: '#FFFFFF',
-    fontSize: 26,
-    fontWeight: '900',
-    textAlign: 'center',
-    width: 36,
-    fontFamily: 'System',
-    lineHeight: 28,
-  },
-  arrowBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  timeColon: {
+  wheelColon: {
     color: '#555555',
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '900',
-    marginHorizontal: 1,
-    alignSelf: 'center',
+    marginHorizontal: 2,
+    marginTop: -4,
   },
-  ampmButton: {
-    backgroundColor: '#222222',
+  separatorCol: {
     paddingHorizontal: 8,
-    paddingVertical: 10,
-    borderRadius: 6,
-    marginLeft: 6,
-    minWidth: 42,
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ampmText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  timeInputSeparator: {
-    paddingHorizontal: 6,
   },
   separatorText: {
     color: '#444444',
     fontWeight: '900',
     fontSize: 10,
+    letterSpacing: 1,
   },
-  timeTip: {
-    color: '#555555',
-    fontSize: 10,
-    marginTop: 12,
-    textAlign: 'center',
+  timeDisplayRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#0A0A0A',
+    borderRadius: 8,
+    padding: 10,
+  },
+  timeDisplayText: {
+    color: '#00C7FC',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  timeDisplayArrow: {
+    color: '#444444',
+    fontSize: 16,
+    fontWeight: '900',
   },
   sectionTitle: {
     color: '#FFFFFF',

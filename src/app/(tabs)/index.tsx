@@ -1,24 +1,38 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Dimensions, AppState, AppStateStatus } from 'react-native';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Platform,
+  Dimensions,
+  AppState,
+  AppStateStatus,
+  Animated,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Shield, ShieldAlert, Skull, Play, Square, AlertTriangle, RefreshCw } from 'lucide-react-native';
 import * as TouchGrass from 'touch-grass';
 import * as DB from '../../db/database';
 
+// Try to import haptics — it's bundled with expo but may not be linked, so we guard it
+let Haptics: any = null;
+try {
+  Haptics = require('expo-haptics');
+} catch (_) { /* no haptics available */ }
+
 function isCurrentTimeInWindowJS(start: string, end: string): boolean {
   try {
     const [startH, startM] = start.split(':').map(Number);
     const [endH, endM] = end.split(':').map(Number);
-    
     const now = new Date();
     const nowH = now.getHours();
     const nowM = now.getMinutes();
-    
     const startTimeMinutes = startH * 60 + startM;
     const endTimeMinutes = endH * 60 + endM;
     const nowTimeMinutes = nowH * 60 + nowM;
-    
     if (endTimeMinutes > startTimeMinutes) {
       return nowTimeMinutes >= startTimeMinutes && nowTimeMinutes <= endTimeMinutes;
     } else {
@@ -36,19 +50,73 @@ export default function DashboardScreen() {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [blockedCount, setBlockedCount] = useState(0);
   const [isCheckingLock, setIsCheckingLock] = useState(true);
-  
+
   // Permissions
   const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
   const [overlayGranted, setOverlayGranted] = useState(false);
-  
+
   // AI State
   const [aiMood, setAiMood] = useState('neutral');
   const [consequenceLevel, setConsequenceLevel] = useState(0);
   const [latestRoast, setLatestRoast] = useState('');
 
+  // Animated values for smooth transitions
+  const shieldColorAnim = useRef(new Animated.Value(0)).current; // 0=cyan(unlocked), 1=red(locked)
+  const shieldScaleAnim = useRef(new Animated.Value(1)).current;
+  const unlockFlashAnim = useRef(new Animated.Value(0)).current;
+  const lockedShieldOpacity = useRef(new Animated.Value(0)).current;
+  const unlockedShieldOpacity = useRef(new Animated.Value(1)).current;
+
+  // Track previous locked state to detect transitions
+  const prevIsLocked = useRef<boolean | null>(null);
+
+  const triggerUnlockCelebration = useCallback(() => {
+    // Haptic feedback
+    try {
+      Haptics?.notificationAsync?.(Haptics.NotificationFeedbackType?.Success);
+    } catch (_) { /* no haptics */ }
+
+    // Green flash
+    Animated.sequence([
+      Animated.timing(unlockFlashAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
+      Animated.timing(unlockFlashAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
+    ]).start();
+
+    // Scale pulse on the dial
+    Animated.sequence([
+      Animated.timing(shieldScaleAnim, { toValue: 1.08, duration: 120, useNativeDriver: true }),
+      Animated.timing(shieldScaleAnim, { toValue: 0.96, duration: 100, useNativeDriver: true }),
+      Animated.timing(shieldScaleAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  const animateShieldTransition = useCallback((toLocked: boolean) => {
+    const toValue = toLocked ? 1 : 0;
+
+    // Cross-fade shield icons
+    Animated.parallel([
+      Animated.timing(lockedShieldOpacity, {
+        toValue: toLocked ? 1 : 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(unlockedShieldOpacity, {
+        toValue: toLocked ? 0 : 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Animate the color interpolation
+    Animated.timing(shieldColorAnim, {
+      toValue,
+      duration: 400,
+      useNativeDriver: false,
+    }).start();
+  }, []);
+
   const loadData = useCallback(() => {
     try {
-      // 1. Sync permissions
       if (Platform.OS === 'android') {
         const isAccessEnabled = TouchGrass.isAccessibilityServiceEnabled();
         const isOverGranted = TouchGrass.isOverlayPermissionGranted();
@@ -59,44 +127,42 @@ export default function DashboardScreen() {
         setOverlayGranted(true);
       }
 
-      // 2. Load settings and database values
       const currentMood = DB.getSetting('ai_mood') || 'neutral';
       const conLevelStr = DB.getSetting('consequence_level') || '0';
       setAiMood(currentMood);
       setConsequenceLevel(parseInt(conLevelStr, 10));
 
-      // 3. Load latest AI message
       const history = DB.getChatHistory();
       const aiMessages = history.filter(m => m.role === 'ai');
-      let aiRoast = "";
+      let aiRoast = '';
       if (aiMessages.length > 0) {
         aiRoast = aiMessages[aiMessages.length - 1].message;
       } else {
-        aiRoast = "Oh look, you haven't locked your phone yet. Ready to fail your productivity goals today?";
+        aiRoast =
+          "Oh look, you haven't locked your phone yet. Ready to fail your productivity goals today?";
       }
 
-      // 4. Synchronize database schedules to native SharedPreferences and get current state
       if (Platform.OS === 'android') {
         const schedules = DB.getSchedules();
-        const activePackages = schedules.filter(s => s.is_enabled).map(s => s.app_package).join(',');
-        
+        const activePackages = schedules
+          .filter(s => s.is_enabled)
+          .map(s => s.app_package)
+          .join(',');
+
         const state = TouchGrass.getLockState();
         const now = Date.now();
-        
+
         let targetLocked = state.isLocked;
         let targetUntil = state.lockUntil;
 
-        // Reset manual lock if the timer finished
         if (state.isLocked && state.lockUntil <= now) {
           TouchGrass.updateLockState(false, 0, activePackages);
           targetLocked = false;
           targetUntil = 0;
         } else {
-          // Always make sure latest active packages are synced to SharedPreferences
           TouchGrass.updateLockState(state.isLocked, state.lockUntil, activePackages);
         }
 
-        // Check if the Global Lockdown window is active in JS to show correctly in the UI
         let isGlobalLocked = false;
         const globalEnabled = DB.getSetting('global_lock_enabled') === 'true';
         if (globalEnabled) {
@@ -105,27 +171,48 @@ export default function DashboardScreen() {
           isGlobalLocked = isCurrentTimeInWindowJS(start, end);
         }
 
-        // Clock tampering bypass protection in UI
         const autoTimeEnabled = TouchGrass.isAutoTimeEnabled();
         if (!autoTimeEnabled && (state.isLocked || globalEnabled)) {
-          aiRoast = "DETECTED CLOCK TAMPERING! Nice try, changing the system time won't save you. Put the phone down.";
+          aiRoast =
+            'DETECTED CLOCK TAMPERING! Nice try, changing the system time won\'t save you. Put the phone down.';
           setAiMood('angry');
         }
         setLatestRoast(aiRoast);
 
-        const isShieldActive = targetLocked || isGlobalLocked || (!autoTimeEnabled && (state.isLocked || globalEnabled));
+        const isShieldActive =
+          targetLocked ||
+          isGlobalLocked ||
+          (!autoTimeEnabled && (state.isLocked || globalEnabled));
+
+        // Detect lock state transitions for animations
+        if (prevIsLocked.current !== null && prevIsLocked.current !== isShieldActive) {
+          animateShieldTransition(isShieldActive);
+          if (!isShieldActive && prevIsLocked.current === true) {
+            // Just unlocked!
+            triggerUnlockCelebration();
+          }
+        } else if (prevIsLocked.current === null) {
+          // Initial load: set without animation
+          shieldColorAnim.setValue(isShieldActive ? 1 : 0);
+          lockedShieldOpacity.setValue(isShieldActive ? 1 : 0);
+          unlockedShieldOpacity.setValue(isShieldActive ? 0 : 1);
+        }
+        prevIsLocked.current = isShieldActive;
+
         setIsLocked(isShieldActive);
         setLockUntil(targetLocked ? targetUntil : 0);
-        
-        // Count blocked packages
-        const blockedArr = activePackages.split(',').map(s => s.trim()).filter(Boolean);
+
+        const blockedArr = activePackages
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean);
         setBlockedCount(blockedArr.length);
       } else {
-        // Mock for other platforms
+        setLatestRoast(aiRoast);
         setBlockedCount(0);
       }
     } catch (e) {
-      console.error("Error loading dashboard data:", e);
+      console.error('Error loading dashboard data:', e);
     }
   }, []);
 
@@ -164,14 +251,11 @@ export default function DashboardScreen() {
         loadData();
       }
     };
-
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-    return () => {
-      subscription.remove();
-    };
+    return () => subscription.remove();
   }, [loadData]);
 
-  // Periodically reload dashboard state to auto-update when locks expire and tick countdown
+  // Periodically reload dashboard state — smooth tick every second
   useEffect(() => {
     const interval = setInterval(() => {
       loadData();
@@ -182,30 +266,20 @@ export default function DashboardScreen() {
 
   const toggleShield = () => {
     if (!accessibilityEnabled || !overlayGranted) {
-      // Direct user to Console tab to grant permissions
       router.push('/settings');
       return;
     }
-
     if (isLocked) {
-      // Active manual lock or active global lock requires negotiation!
       router.push('/lockscreen');
     } else {
-      // Start the shield!
-      // Fetch all schedules packages or just add all listed packages
       const schedules = DB.getSchedules();
       const activePackages = schedules.filter(s => s.is_enabled).map(s => s.app_package);
-      
       if (activePackages.length === 0) {
-        // Force navigate to App list if no apps are selected yet
         router.push('/apps');
         return;
       }
-
-      // Lock for 8 hours by default
       const eightHoursMs = 8 * 60 * 60 * 1000;
       const targetTime = Date.now() + eightHoursMs;
-      
       const packageString = activePackages.join(',');
       if (Platform.OS === 'android') {
         TouchGrass.updateLockState(true, targetTime, packageString);
@@ -213,14 +287,16 @@ export default function DashboardScreen() {
       setIsLocked(true);
       setLockUntil(targetTime);
       setBlockedCount(activePackages.length);
-
-      // AI mocks you for beginning your lockdown
-      DB.addChatMessage('ai', "Lockdown active. 8 hours of sensory deprivation from your toxic digital pacifiers. Don't even think about disabling this.", 'sarcastic');
+      animateShieldTransition(true);
+      DB.addChatMessage(
+        'ai',
+        "Lockdown active. 8 hours of sensory deprivation from your toxic digital pacifiers. Don't even think about disabling this.",
+        'sarcastic'
+      );
       loadData();
     }
   };
 
-  // Format AI avatar and text depending on mood
   const getAiAvatar = () => {
     switch (aiMood) {
       case 'annoyed':
@@ -242,15 +318,35 @@ export default function DashboardScreen() {
     const hrs = Math.floor(diff / (3600 * 1000));
     const mins = Math.floor((diff % (3600 * 1000)) / (60 * 1000));
     const secs = Math.floor((diff % (60 * 1000)) / 1000);
-    
-    if (hrs > 0) {
-      return `LOCKED: ${hrs}h ${mins}m`;
-    }
-    return `PENALTY: ${mins}m ${secs}s`;
+    if (hrs > 0) return `LOCKED: ${hrs}h ${mins}m`;
+    return `LOCKED: ${mins}m ${secs}s`;
   };
+
+  // Interpolated border color for the dial ring
+  const dialBorderColor = shieldColorAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#00C7FC', '#FF3B30'],
+  });
+
+  const dialStatusColor = shieldColorAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#00C7FC', '#FF3B30'],
+  });
+
+  // Green flash overlay color for unlock celebration
+  const unlockFlashColor = unlockFlashAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(52,199,89,0)', 'rgba(52,199,89,0.25)'],
+  });
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Green unlock flash overlay */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.flashOverlay, { backgroundColor: unlockFlashColor }]}
+      />
+
       {isCheckingLock ? (
         <View key="checking-view" style={{ flex: 1, backgroundColor: '#0D0D0D' }} />
       ) : (
@@ -265,14 +361,16 @@ export default function DashboardScreen() {
 
           {/* Permission Alerts */}
           {(!accessibilityEnabled || !overlayGranted) && (
-            <TouchableOpacity 
-              style={styles.permissionAlert} 
+            <TouchableOpacity
+              style={styles.permissionAlert}
               onPress={() => router.push('/settings')}
             >
               <AlertTriangle color="#FF3B30" size={20} />
               <View style={styles.permissionTextContainer}>
                 <Text style={styles.permissionAlertTitle}>SYSTEM BYPASSED</Text>
-                <Text style={styles.permissionAlertDesc}>Native services offline. Tap here to configure permissions.</Text>
+                <Text style={styles.permissionAlertDesc}>
+                  Native services offline. Tap here to configure permissions.
+                </Text>
               </View>
             </TouchableOpacity>
           )}
@@ -289,31 +387,43 @@ export default function DashboardScreen() {
             <Text style={styles.aiRoastText}>"{latestRoast}"</Text>
           </View>
 
-          {/* Lock Shield Dial */}
+          {/* Lock Shield Dial with Animated transitions */}
           <View style={styles.dialContainer}>
-            <View style={[
-              styles.outerDial, 
-              { borderColor: isLocked ? '#FF3B30' : '#00C7FC' }
-            ]}>
+            <Animated.View
+              style={[
+                styles.outerDial,
+                {
+                  borderColor: dialBorderColor,
+                  transform: [{ scale: shieldScaleAnim }],
+                },
+              ]}
+            >
               <View style={styles.innerDial}>
-                {isLocked ? (
-                  <ShieldAlert color="#FF3B30" size={64} />
-                ) : (
-                  <Shield color="#00C7FC" size={64} />
-                )}
-                <Text style={[styles.dialStatus, { color: isLocked ? '#FF3B30' : '#00C7FC' }]}>
+                {/* Cross-fading shield icons */}
+                <View style={styles.iconStack}>
+                  <Animated.View style={[styles.iconAbsolute, { opacity: lockedShieldOpacity }]}>
+                    <ShieldAlert color="#FF3B30" size={64} />
+                  </Animated.View>
+                  <Animated.View style={[styles.iconAbsolute, { opacity: unlockedShieldOpacity }]}>
+                    <Shield color="#00C7FC" size={64} />
+                  </Animated.View>
+                </View>
+
+                <Animated.Text style={[styles.dialStatus, { color: dialStatusColor }]}>
                   {isLocked ? 'SHIELD ON' : 'SHIELD OFF'}
-                </Text>
+                </Animated.Text>
+
                 <Text style={styles.dialDetail}>
                   {isLocked ? `${blockedCount} APPS BLOCKED` : 'READY FOR SHIELD'}
                 </Text>
+
                 {lockUntil > Date.now() && (
                   <Text style={[styles.dialCountdown, { color: '#FF3B30' }]}>
                     {getRemainingTimeStr()}
                   </Text>
                 )}
               </View>
-            </View>
+            </Animated.View>
           </View>
 
           {/* Quick Stats Grid */}
@@ -323,7 +433,12 @@ export default function DashboardScreen() {
               <Text style={styles.statLabel}>Restricted Apps</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={[styles.statVal, { color: consequenceLevel > 0 ? '#FF3B30' : '#FFFFFF' }]}>
+              <Text
+                style={[
+                  styles.statVal,
+                  { color: consequenceLevel > 0 ? '#FF3B30' : '#FFFFFF' },
+                ]}
+              >
                 {consequenceLevel}
               </Text>
               <Text style={styles.statLabel}>Excuse Strikes</Text>
@@ -331,11 +446,11 @@ export default function DashboardScreen() {
           </View>
 
           {/* Main Action Button */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
-              styles.actionButton, 
-              { backgroundColor: isLocked ? '#FF3B30' : '#00C7FC' }
-            ]} 
+              styles.actionButton,
+              { backgroundColor: isLocked ? '#FF3B30' : '#00C7FC' },
+            ]}
             onPress={toggleShield}
           >
             {isLocked ? (
@@ -360,6 +475,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0D0D0D',
+  },
+  flashOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    zIndex: 999,
   },
   scrollContainer: {
     padding: 20,
@@ -460,7 +583,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#111111',
-    shadowColor: '#00C7FC',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.15,
     shadowRadius: 15,
@@ -473,6 +595,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#0A0A0A',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  iconStack: {
+    width: 64,
+    height: 64,
+    position: 'relative',
+    marginBottom: 4,
+  },
+  iconAbsolute: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
   },
   dialStatus: {
     fontSize: 18,

@@ -42,6 +42,7 @@ export function initDatabase() {
     database.runSync(`INSERT OR IGNORE INTO settings (key, value) VALUES ('ai_mood', 'neutral');`);
     database.runSync(`INSERT OR IGNORE INTO settings (key, value) VALUES ('consequence_level', '0');`);
     database.runSync(`INSERT OR IGNORE INTO settings (key, value) VALUES ('difficulty', 'medium');`);
+    database.runSync(`INSERT OR IGNORE INTO settings (key, value) VALUES ('onboarding_complete', 'false');`);
   } catch (e) {
     console.error('Error inserting default settings:', e);
   }
