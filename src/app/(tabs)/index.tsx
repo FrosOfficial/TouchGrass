@@ -172,7 +172,7 @@ export default function DashboardScreen() {
         }
 
         const autoTimeEnabled = TouchGrass.isAutoTimeEnabled();
-        if (!autoTimeEnabled && (state.isLocked || globalEnabled)) {
+        if (!autoTimeEnabled && (targetLocked || globalEnabled)) {
           aiRoast =
             'DETECTED CLOCK TAMPERING! Nice try, changing the system time won\'t save you. Put the phone down.';
           setAiMood('angry');
@@ -182,7 +182,7 @@ export default function DashboardScreen() {
         const isShieldActive =
           targetLocked ||
           isGlobalLocked ||
-          (!autoTimeEnabled && (state.isLocked || globalEnabled));
+          (!autoTimeEnabled && (targetLocked || globalEnabled));
 
         // Detect lock state transitions for animations
         if (prevIsLocked.current !== null && prevIsLocked.current !== isShieldActive) {

@@ -47,7 +47,8 @@ function isCurrentLockActive(): boolean {
   try {
     const state = TouchGrass.getLockState();
     const now = Date.now();
-    let active = state.isLocked && state.lockUntil > now;
+    const isManualLockActive = state.isLocked && state.lockUntil > now;
+    let active = isManualLockActive;
     const globalEnabled = DB.getSetting('global_lock_enabled') === 'true';
     if (!active && globalEnabled) {
       const start = DB.getSetting('global_lock_start') || '09:00';
@@ -55,7 +56,7 @@ function isCurrentLockActive(): boolean {
       if (isCurrentTimeInWindowJS(start, end)) active = true;
     }
     const autoTimeEnabled = TouchGrass.isAutoTimeEnabled();
-    if (!autoTimeEnabled && (state.isLocked || globalEnabled)) active = true;
+    if (!autoTimeEnabled && (isManualLockActive || globalEnabled)) active = true;
     return active;
   } catch (e) {
     console.error(e);
@@ -129,6 +130,12 @@ export default function LockScreen() {
         setCurrentTime(Date.now());
         const active = isCurrentLockActive();
         if (!active) {
+          try {
+            const currentState = TouchGrass.getLockState();
+            TouchGrass.updateLockState(false, 0, currentState.blockedPackages);
+          } catch (e) {
+            console.error('Failed to reset lock state natively:', e);
+          }
           TouchGrass.clearActiveBlockedPackage();
           setTimeout(() => { router.replace('/(tabs)'); }, 0);
         }
