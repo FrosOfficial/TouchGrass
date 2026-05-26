@@ -39,14 +39,39 @@ function compose12To24(hours12: string, minutes: string, ampm: 'AM' | 'PM') {
   return `${hStr}:${m}`;
 }
 
+function isCurrentTimeInWindowJS(start: string, end: string): boolean {
+  try {
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    const now = new Date();
+    const nowH = now.getHours();
+    const nowM = now.getMinutes();
+    const startTimeMinutes = startH * 60 + startM;
+    const endTimeMinutes = endH * 60 + endM;
+    const nowTimeMinutes = nowH * 60 + nowM;
+    if (endTimeMinutes > startTimeMinutes) {
+      return nowTimeMinutes >= startTimeMinutes && nowTimeMinutes <= endTimeMinutes;
+    } else {
+      return nowTimeMinutes >= startTimeMinutes || nowTimeMinutes <= endTimeMinutes;
+    }
+  } catch (e) {
+    return false;
+  }
+}
+
 export default function SchedulesScreen() {
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('17:00');
   const [isGlobalEnabled, setIsGlobalEnabled] = useState(false);
   const [activePreset, setActivePreset] = useState<string | null>(null);
+  const [currentTimeTick, setCurrentTimeTick] = useState(Date.now());
 
   useEffect(() => {
     loadSettings();
+    const interval = setInterval(() => {
+      setCurrentTimeTick(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const loadSettings = () => {
@@ -159,16 +184,24 @@ export default function SchedulesScreen() {
         {/* Global Toggle Card */}
         <View style={[styles.card, isGlobalEnabled && styles.cardActive]}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Global Lockdown Window</Text>
+            <View>
+              <Text style={styles.cardTitle}>Global Lockdown Window</Text>
+              <View style={styles.statusBadgeContainer}>
+                <View style={[styles.statusDot, { backgroundColor: isGlobalEnabled && isCurrentTimeInWindowJS(startTime, endTime) ? '#FF9500' : '#555555' }]} />
+                <Text style={[styles.statusBadgeText, { color: isGlobalEnabled && isCurrentTimeInWindowJS(startTime, endTime) ? '#FF9500' : '#555555' }]}>
+                  {isGlobalEnabled && isCurrentTimeInWindowJS(startTime, endTime) ? 'IN SESSION (ACTIVE)' : 'OFF SCHEDULE (INACTIVE)'}
+                </Text>
+              </View>
+            </View>
             <TouchableOpacity
               style={[styles.toggleBtn, isGlobalEnabled && styles.toggleBtnActive]}
               onPress={toggleGlobalLock}
             >
-              <Text style={styles.toggleText}>{isGlobalEnabled ? 'ACTIVE' : 'OFF'}</Text>
+              <Text style={styles.toggleText}>{isGlobalEnabled ? 'ENABLED' : 'DISABLED'}</Text>
             </TouchableOpacity>
           </View>
           <Text style={styles.cardDesc}>
-            When active, apps in your Shield List will automatically lock down tight between these times.
+            When enabled, apps in your Shield List will automatically lock down tight between these times.
           </Text>
 
           {/* Time Pickers Row */}
@@ -298,6 +331,22 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  statusBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
     letterSpacing: 0.5,
   },
   toggleBtn: {
