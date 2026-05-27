@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Clock, ShieldAlert } from 'lucide-react-native';
 import * as DB from '../../db/database';
 import * as TouchGrass from 'touch-grass';
@@ -60,11 +61,47 @@ function isCurrentTimeInWindowJS(start: string, end: string): boolean {
 }
 
 export default function SchedulesScreen() {
+  const router = useRouter();
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('17:00');
   const [isGlobalEnabled, setIsGlobalEnabled] = useState(false);
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const [currentTimeTick, setCurrentTimeTick] = useState(Date.now());
+
+  // Shield guard: block access to timer settings during active lockdown
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === 'android') {
+        try {
+          const state = TouchGrass.getLockState();
+          const now = Date.now();
+          const isManualLockActive = state.isLocked && state.lockUntil > now;
+          const globalEnabled = DB.getSetting('global_lock_enabled') === 'true';
+          let shieldActive = isManualLockActive;
+          if (!shieldActive && globalEnabled) {
+            const start = DB.getSetting('global_lock_start') || '09:00';
+            const end = DB.getSetting('global_lock_end') || '17:00';
+            const [startH, startM] = start.split(':').map(Number);
+            const [endH, endM] = end.split(':').map(Number);
+            const d = new Date();
+            const nowMins = d.getHours() * 60 + d.getMinutes();
+            const startMins = startH * 60 + startM;
+            const endMins = endH * 60 + endM;
+            if (endMins > startMins) {
+              if (nowMins >= startMins && nowMins <= endMins) shieldActive = true;
+            } else {
+              if (nowMins >= startMins || nowMins <= endMins) shieldActive = true;
+            }
+          }
+          if (shieldActive) {
+            router.replace('/lockscreen');
+          }
+        } catch (e) {
+          console.error('Shield guard check failed on timer tab:', e);
+        }
+      }
+    }, [])
+  );
 
   useEffect(() => {
     loadSettings();
